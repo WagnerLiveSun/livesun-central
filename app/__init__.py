@@ -58,7 +58,9 @@ def create_app(overrides=None):
     def headers(response):
         response.headers['X-Content-Type-Options'] = 'nosniff'
         response.headers['X-Frame-Options'] = 'DENY'
-        response.headers['Referrer-Policy'] = 'no-referrer'
+        # Flask-WTF valida Referer em POST HTTPS; omitir em todos os casos
+        # bloqueia inclusive formulários legítimos. Não enviar a outros sites.
+        response.headers['Referrer-Policy'] = 'same-origin'
         response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
         if app.config['APP_ENV'] == 'production':
             response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
