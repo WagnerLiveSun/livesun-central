@@ -1,5 +1,7 @@
 # Publicação do LiveSun Central
 
+**Atualização para MontuDB:** o banco é alcançado por SSH, com Secret File `/etc/secrets/SKey`. Utilize runtime Docker e os comandos atuais de `docs/RENDER_SSH_MONTUDB.md`; os comandos de runtime Python/conexão PostgreSQL direta abaixo são referência anterior e não devem ser usados nesse cenário. `.env.render` foi atualizado para SSH e mantém senha/Redis pendentes de preenchimento.
+
 ## Destino autorizado
 
 - Git: `https://github.com/WagnerLiveSun/livesun-central.git`

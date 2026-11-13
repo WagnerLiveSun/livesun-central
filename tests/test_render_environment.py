@@ -32,8 +32,9 @@ def test_render_manifest_uses_production_hosts_and_manual_deploy():
     assert source.count("autoDeployTrigger: 'off'") == 2
     assert 'propostas.livesun.com.br,app.livesun.com.br' in source
     assert 'value: postgresql' in source
-    assert 'flask --app wsgi worker' in source
-    assert 'gunicorn' in source
+    assert 'scripts/with_ssh_tunnel.py worker' in source
+    assert 'scripts/with_ssh_tunnel.py web' in source
+    assert source.count('runtime: docker') == 2
 
 
 def test_production_factory_boots_with_shared_rate_limit_configuration():

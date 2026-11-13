@@ -1,5 +1,7 @@
 # LiveSun Central
 
+**Render + MontuDB por SSH:** runtime Docker com OpenSSH e Secret File `/etc/secrets/SKey`. Guia e Environment atual em `docs/RENDER_SSH_MONTUDB.md` e `deploy/render.ssh.environment.example`. Inicialização web, worker e pré-deploy supervisionam seu próprio túnel antes de acessar `DbCentral`.
+
 **PostgreSQL local preparado:** use `D:\App_LiveSun\LiveSun_CentralControle\Iniciar_LiveSun_Central_PostgreSQL.bat`. Perfil separado `.env.postgresql`, banco `DbCentral` em `127.0.0.1:55433`; configuração MySQL preservada. Instruções em `docs/POSTGRESQL_LOCAL.md`. Dados de MySQL não são transferidos automaticamente.
 
 **Fluxo atual de operação:** consulte `docs/AJUSTE_COBRANCA_PAINEL.md`. Cobrança é configurada no produto e operada na assinatura do cliente/plano. O processo anterior de migração por arquivo foi removido. Bonificações existentes são preservadas e não iniciam cobrança automaticamente.

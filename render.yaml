@@ -18,24 +18,42 @@ envVarGroups:
         value: 'false'
       - key: TRUST_PROXY
         value: 'true'
+      - key: SSH_ENABLED
+        value: 'true'
+      - key: SSH_HOST
+        value: wagner.montudb.com
+      - key: SSH_USER
+        value: opc
+      - key: SSH_PORT
+        value: '22'
+      - key: SSH_REMOTE_PORT
+        value: '55433'
+      - key: SSH_LOCAL_PORT
+        value: '55433'
+      - key: SSH_KEY_PATH
+        value: /etc/secrets/SKey
+      - key: SSH_KNOWN_HOSTS_PATH
+        value: /app/deploy/montudb_known_hosts
+      - key: SSH_STARTUP_TIMEOUT_SECONDS
+        value: '90'
 services:
   - type: web
     name: livesun-central
-    runtime: python
+    runtime: docker
     plan: starter
-    buildCommand: pip install -r requirements.lock.txt
+    dockerfilePath: ./Dockerfile
     autoDeployTrigger: 'off'
-    preDeployCommand: flask --app wsgi db upgrade && flask --app wsgi seed
-    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 2 --threads 4 --access-logfile /dev/null wsgi:app
+    preDeployCommand: python scripts/with_ssh_tunnel.py prepare
+    dockerCommand: python scripts/with_ssh_tunnel.py web
     healthCheckPath: /api/v1/health
     envVars:
       - fromGroup: livesun-central-secrets
   - type: worker
     name: livesun-central-worker
-    runtime: python
+    runtime: docker
     plan: starter
-    buildCommand: pip install -r requirements.lock.txt
+    dockerfilePath: ./Dockerfile
     autoDeployTrigger: 'off'
-    startCommand: flask --app wsgi worker
+    dockerCommand: python scripts/with_ssh_tunnel.py worker
     envVars:
       - fromGroup: livesun-central-secrets

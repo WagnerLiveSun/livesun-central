@@ -1,0 +1,20 @@
+# Mesmo Environment e Secret File SKey no web e no worker.
+APP_ENV=production
+DB_ENGINE=postgresql
+DATABASE_URL=postgresql+psycopg://postgres:SENHA_DO_BANCO@127.0.0.1:55433/DbCentral?sslmode=disable&connect_timeout=5
+SSH_ENABLED=true
+SSH_HOST=wagner.montudb.com
+SSH_USER=opc
+SSH_PORT=22
+SSH_REMOTE_PORT=55433
+SSH_LOCAL_PORT=55433
+SSH_KEY_PATH=/etc/secrets/SKey
+SSH_KNOWN_HOSTS_PATH=/app/deploy/montudb_known_hosts
+SSH_STARTUP_TIMEOUT_SECONDS=90
+SECRET_KEY=CHAVE_PRIVADA_DO_ENVIRONMENT
+JWT_SECRET=OUTRA_CHAVE_PRIVADA_DO_ENVIRONMENT
+ENCRYPTION_KEY=CHAVE_FERNET_DO_ENVIRONMENT
+RATELIMIT_STORAGE_URI=redis://HOST_REDIS:6379/0
+WEBHOOK_ALLOWED_HOSTS=propostas.livesun.com.br,app.livesun.com.br
+WEBHOOK_ALLOW_LOCAL_HTTP=false
+TRUST_PROXY=true

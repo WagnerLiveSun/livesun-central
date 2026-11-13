@@ -1,0 +1,17 @@
+.git
+.env
+.env.*
+.venv
+__pycache__
+**/__pycache__
+.pytest_cache
+instance
+backups
+*.db
+*.log
+*.key
+*.pem
+*.pfx
+*.p12
+*.zip
+SKey
