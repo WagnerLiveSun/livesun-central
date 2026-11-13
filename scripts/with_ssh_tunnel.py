@@ -136,6 +136,10 @@ def check_known_hosts(settings):
 
 def assert_local_port_free(settings):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        # Em Linux, conexões recém-encerradas podem estar em TIME_WAIT.
+        # Não habilitar no Windows, onde SO_REUSEADDR permite outro listener.
+        if os.name == 'posix':
+            probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
             probe.bind(('127.0.0.1', settings.local_port))
         except OSError:
@@ -242,10 +246,14 @@ def supervise(mode, env=None):
                 time.sleep(0.5)
             return 0
     finally:
-        stop(app)
-        stop(ssh)
-        for signum, handler in previous.items():
-            signal.signal(signum, handler)
+        try:
+            stop(app)
+        finally:
+            try:
+                stop(ssh)
+            finally:
+                for signum, handler in previous.items():
+                    signal.signal(signum, handler)
 
 
 def main():

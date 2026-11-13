@@ -2,6 +2,7 @@ import importlib.util
 import os
 from pathlib import Path
 import signal
+import socket
 import sys
 from unittest.mock import Mock
 import pytest
@@ -178,3 +179,15 @@ def test_stop_during_preparation_stops_children_without_starting_web(tmp_path, m
     assert tunnel.supervise('web', env) == 0
     assert len(commands) == 2
     assert stopped == [prepare, ssh]
+
+
+def test_active_local_listener_is_never_reused(tmp_path):
+    env = environment(tmp_path)
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
+        listener.bind(('127.0.0.1', 0))
+        listener.listen(1)
+        local_port = listener.getsockname()[1]
+        env['SSH_LOCAL_PORT'] = str(local_port)
+        env['DATABASE_URL'] = f'postgresql+psycopg://test:secret@127.0.0.1:{local_port}/DbCentral'
+        with pytest.raises(tunnel.TunnelError, match='ocupada'):
+            tunnel.assert_local_port_free(tunnel.Settings.from_env(env))

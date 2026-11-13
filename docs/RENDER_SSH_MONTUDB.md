@@ -57,6 +57,8 @@ A chave montada pode ser somente leitura/permissões amplas: o supervisor a copi
 - A preparação na inicialização executa migrations/seed sem recriar banco. Recusa banco sem Alembic ou com tabelas externas. Migrations devem ser revisadas antes de publicar.
 - Falha de POST comercial em andamento continua sujeita aos mecanismos de fila/idempotência; túnel não garante ausência de falhas de rede.
 - Logs esperados: `ssh_tunnel_and_database_ready`, `database_preparation_started`, `database_preparation_completed`, `application_started` e, em queda, `ssh_tunnel_disconnected`.
+- A preparação registra `preparation_stage_started` e, em falha, `preparation_stage_failed` com `stage` e orientação fixa, sem valores de Environment nem texto de exceções. Estágios distinguem chaves ausentes, configuração de produção/Redis, chave Fernet, criação da aplicação, schema, migrations, seeds e bootstrap do administrador.
+- Uma falha de preparação não significa falha SSH: `ssh_tunnel_and_database_ready` confirma que SSH e SELECT 1 funcionaram naquela tentativa. Se surgir porta ocupada, não mate processos desconhecidos nem desative a verificação. O teste de porta em Linux permite TIME_WAIT, mas continua recusando listeners ativos; o encerramento tenta parar SSH mesmo se parar o filho falhar.
 
 Se timeout: conferir SKey no serviço certo, autorização de chave opc, firewall SSH 22 para saída do Render (incluindo worker), fingerprint e serviço MontuDB2 na porta 55433. Não apagar tabelas para corrigir conectividade.
 
