@@ -85,7 +85,7 @@ def command_for(mode, env):
     if mode == 'web':
         http_port = port(env.get('PORT', '10000'))
         return [sys.executable, '-m', 'gunicorn', '--bind', f'0.0.0.0:{http_port}',
-                '--workers', '2', '--threads', '4', '--timeout', '60', 'wsgi:app']
+                '--workers', '1', '--threads', '4', '--timeout', '60', 'wsgi:app']
     if mode == 'worker':
         return [sys.executable, '-m', 'flask', '--app', 'wsgi', 'worker']
     if mode == 'prepare':

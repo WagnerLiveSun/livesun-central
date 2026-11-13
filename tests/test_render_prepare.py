@@ -24,12 +24,16 @@ def test_preparation_environment_valid(production_env):
     prepare.validate_environment()
 
 
+def test_preparation_does_not_require_redis(production_env, monkeypatch):
+    monkeypatch.delenv('RATELIMIT_STORAGE_URI', raising=False)
+    prepare.validate_environment()
+
+
 @pytest.mark.parametrize('key,value,expected', [
     ('SECRET_KEY', '', 'SECRET_KEY'),
     ('JWT_SECRET', '', 'JWT_SECRET'),
     ('ENCRYPTION_KEY', '', 'ENCRYPTION_KEY'),
     ('SECRET_KEY', 'short', 'app_configuration'),
-    ('RATELIMIT_STORAGE_URI', 'memory://', 'app_configuration'),
     ('ENCRYPTION_KEY', 'not-a-real-key', 'encryption_key'),
 ])
 def test_preparation_reports_safe_stage(production_env, monkeypatch, capsys, key, value, expected):

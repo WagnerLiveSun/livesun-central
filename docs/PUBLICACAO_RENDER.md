@@ -19,7 +19,7 @@ Publique somente a pasta `livesun-central` como raiz do repositório. Não publi
 ## Pré-requisitos
 
 1. PostgreSQL exclusivo acessível pelo Render, com TLS. `127.0.0.1:55433` aponta para a própria instância Render, não o computador local, e não serve como endereço do banco remoto.
-2. Redis compartilhado para rate limit, configurado em `RATELIMIT_STORAGE_URI`. Web e worker devem receber as mesmas chaves da aplicação e URL de banco.
+2. Redis é opcional para instância única: o inicializador atual usa um processo web com limites em memória. Para múltiplos processos/instâncias, configure armazenamento compartilhado em `RATELIMIT_STORAGE_URI`. Contadores locais zeram ao reiniciar. Web e worker devem receber as mesmas chaves da aplicação e URL de banco.
 3. Permissão Git para publicar e acesso administrativo ao serviço Render para salvar Environment/deploy. O ID do serviço e os ranges de saída não são credenciais de API.
 4. Receptores dos produtos publicados devem conter o contrato atual de integração. Publicar somente Central não atualiza Propostas ou Comercial automaticamente.
 

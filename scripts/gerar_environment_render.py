@@ -19,7 +19,6 @@ def generate():
         'SECRET_KEY': secrets.token_urlsafe(48),
         'JWT_SECRET': secrets.token_urlsafe(48),
         'ENCRYPTION_KEY': Fernet.generate_key().decode(),
-        'RATELIMIT_STORAGE_URI': 'PREENCHER_URL_REDIS_COMPARTILHADO',
         'WEBHOOK_ALLOWED_HOSTS': 'propostas.livesun.com.br,app.livesun.com.br',
         'WEBHOOK_ALLOW_LOCAL_HTTP': 'false',
         'TRUST_PROXY': 'true',
@@ -30,7 +29,7 @@ def generate():
         for name, value in values.items():
             stream.write(name + '=' + value + '\n')
         stream.write('# BOOTSTRAP_ADMIN_EMAIL=\n# BOOTSTRAP_ADMIN_NAME=Administrador\n# BOOTSTRAP_ADMIN_PASSWORD=\n')
-    print('Arquivo privado .env.render criado. Complete PostgreSQL e Redis antes de usar no Render.')
+    print('Arquivo privado .env.render criado. Complete PostgreSQL antes de usar no Render; Redis é opcional.')
     print('Chaves geradas sem exibição no terminal; configurações locais preservadas.')
     return destination
 

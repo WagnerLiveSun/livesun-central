@@ -72,6 +72,8 @@ def test_missing_secret_and_untrusted_host_rejected(tmp_path):
 def test_child_commands_include_prepare_web_worker():
     assert 'render_prepare.py' in ' '.join(tunnel.command_for('prepare',{}))
     assert 'gunicorn' in tunnel.command_for('web',{'PORT':'10000'})
+    command = tunnel.command_for('web', {})
+    assert command[command.index('--workers') + 1] == '1'
     assert tunnel.command_for('worker',{})[-1]=='worker'
     assert tunnel.command_for('check',{}) is None
 

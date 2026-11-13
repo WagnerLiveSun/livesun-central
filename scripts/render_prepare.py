@@ -29,7 +29,7 @@ def validate_environment():
               f'Configure {key} no Environment; não use texto de exemplo.')
     app = Flask(__name__)
     stage('app_configuration', lambda: configure(app),
-          'Confira APP_ENV, chaves com pelo menos 32 caracteres, Redis compartilhado em produção e HTTPS dos webhooks.')
+          'Confira APP_ENV, chaves com pelo menos 32 caracteres e HTTPS dos webhooks.')
     stage('encryption_key', lambda: Fernet(app.config['ENCRYPTION_KEY'].encode()),
           'ENCRYPTION_KEY deve ser uma chave Fernet válida. Preserve a chave que criptografou os dados existentes.')
 

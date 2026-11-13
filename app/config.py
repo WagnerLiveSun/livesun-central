@@ -18,7 +18,8 @@ def configure(app, overrides=None):
         ENTITLEMENT_TTL_SECONDS=900, WEBHOOK_MAX_ATTEMPTS=8,
         WEBHOOK_ALLOWED_HOSTS=os.getenv('WEBHOOK_ALLOWED_HOSTS', '').split(','),
         WEBHOOK_ALLOW_LOCAL_HTTP=os.getenv('WEBHOOK_ALLOW_LOCAL_HTTP', 'false').lower() == 'true',
-        RATELIMIT_STORAGE_URI=os.getenv('RATELIMIT_STORAGE_URI', 'memory://'),
+        RATELIMIT_STORAGE_URI=os.getenv('RATELIMIT_STORAGE_URI', '').strip() or 'memory://',
+        RATELIMIT_ENABLED=True,
         TRUST_PROXY=os.getenv('TRUST_PROXY') == 'true',
     )
     app.config.update(overrides or {})
@@ -31,5 +32,5 @@ def configure(app, overrides=None):
             raise RuntimeError(f'Configure {key} no ambiente.')
     if len(app.config['SECRET_KEY']) < 32 or len(app.config['JWT_SECRET']) < 32:
         raise RuntimeError('SECRET_KEY e JWT_SECRET devem ter pelo menos 32 caracteres.')
-    if production and app.config['RATELIMIT_STORAGE_URI'] == 'memory://':
-        raise RuntimeError('Produção exige armazenamento compartilhado de rate limit (ex.: Redis).')
+    # Instância única: limites locais ativos, sem serviço adicional.
+    # Para vários processos/instâncias, configurar backend compartilhado.

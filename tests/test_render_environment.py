@@ -24,6 +24,7 @@ def test_environment_generation_is_private_and_idempotent(tmp_path, monkeypatch)
     Fernet(values['ENCRYPTION_KEY'].encode())
     assert values['WEBHOOK_ALLOW_LOCAL_HTTP'] == 'false'
     assert '127.0.0.1' not in values['DATABASE_URL']
+    assert 'RATELIMIT_STORAGE_URI' not in values
 
 
 def test_render_manifest_uses_production_hosts_and_manual_deploy():
@@ -38,6 +39,7 @@ def test_render_manifest_uses_production_hosts_and_manual_deploy():
     assert 'plan: starter' not in source
     assert 'scripts/with_ssh_tunnel.py web' in source
     assert source.count('runtime: docker') == 1
+    assert 'key: RATELIMIT_STORAGE_URI' not in source
 
 
 def test_production_factory_boots_with_shared_rate_limit_configuration():

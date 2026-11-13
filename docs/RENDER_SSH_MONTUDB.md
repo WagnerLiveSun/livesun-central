@@ -37,7 +37,13 @@ DATABASE_URL=postgresql+psycopg://postgres:SENHA_DO_BANCO@127.0.0.1:55433/DbCent
 
 O PostgreSQL MontuDB foi consultado pelo túnel local e informou `ssl=off`. O tráfego até a VM é protegido pelo **SSH**; o PostgreSQL é alcançado por loopback na VM. Não use esta URL sem o supervisor do túnel. Não exponha a porta 55433 publicamente. O usuário postgres é o acesso administrativo fornecido: recomenda-se criar posteriormente usuário de runtime com privilégios mínimos.
 
-Complete também SECRET_KEY, JWT_SECRET, ENCRYPTION_KEY e RATELIMIT_STORAGE_URI (Redis acessível no Render). As chaves existentes do banco que contém credenciais criptografadas precisam ser preservadas; esta publicação não recriptografa nem transfere dados. As chaves novas geradas em `.env.render` são apropriadas para instalação ainda sem dados criptografados prévios.
+Complete também SECRET_KEY, JWT_SECRET e ENCRYPTION_KEY. As chaves existentes do banco que contém credenciais criptografadas precisam ser preservadas; esta publicação não recriptografa nem transfere dados. As chaves novas geradas em `.env.render` são apropriadas para instalação ainda sem dados criptografados prévios.
+
+### Rate limit sem Redis
+
+Redis não é obrigatório no cenário atual de instância única. Remova `RATELIMIT_STORAGE_URI` do Environment se contiver placeholder. Sem essa variável (ou vazia), o Central usa memória local, mantendo login 5/minuto e API 120/minuto por IP. O supervisor inicia Gunicorn com **1 processo e 4 threads**; não aumente processos/instâncias sem configurar armazenamento compartilhado. Não há nova variável obrigatória nem serviço adicional.
+
+Limitação aceita no Free: contadores zeram em reinícios, suspensão/retomada ou reciclagem do processo e não são compartilhados com outra instância (inclusive sobreposição de deploys). A documentação Flask-Limiter recomenda armazenamento persistente/compartilhado em produção. Redis continua opcional por `RATELIMIT_STORAGE_URI` para futura expansão; não foi desativada a proteção de login/API. Ver `https://flask-limiter.readthedocs.io/en/stable/configuration.html`.
 
 No primeiro acesso, se não houver operador, use BOOTSTRAP_ADMIN_EMAIL/NAME/PASSWORD no Environment e remova a senha após a criação pelo seed. Não há senha padrão.
 
