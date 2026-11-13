@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% block actions %}{% if current_user.perfil in ['superadmin','comercial'] %}<a class="button primary" href="{{ url_for('admin.new_subscription') }}">Nova assinatura</a>{% endif %}{% endblock %}
+{% block content %}
+<div class="metrics">{% for status,label in [('ATIVA','Ativas'),('TRIAL','Em teste'),('SUSPENSA','Suspensas'),('BLOQUEADA','Bloqueadas'),('CANCELADA','Canceladas')] %}<a class="card metric metric-link" href="{{ url_for('admin.subscriptions',status=status) }}"><small>{{ label }}</small><strong>{{ counts.get(status,0) }}</strong></a>{% endfor %}</div>
+<section class="card"><form method="get" class="form-grid"><label>Cliente<input name="busca" value="{{ request.args.get('busca','') }}" placeholder="Pesquisar nome"></label><label>Produto<select name="produto"><option value="">Todos</option>{% for p in products %}<option value="{{ p.id }}" {% if request.args.get('produto') == p.id|string %}selected{% endif %}>{{ p.nome }}</option>{% endfor %}</select></label><label>Status<select name="status"><option value="">Todos</option>{% for status in ['ATIVA','TRIAL','SUSPENSA','BLOQUEADA','CANCELADA','EXCLUIDA'] %}<option {% if request.args.get('status') == status %}selected{% endif %}>{{ status }}</option>{% endfor %}</select></label><button>Filtrar</button></form></section>
+<section class="card table-wrap subscription-grid"><table><thead><tr><th>Cliente / produto</th><th>Plano</th><th>Situação</th><th>Vencimento</th><th>Ações</th></tr></thead><tbody>
+{% set panel_view = true %}{% for obj in page.items %}<tr>
+<td><strong>{{ obj.cliente.razao_social }}</strong><small>{{ obj.produto.nome }}</small></td>
+<td>{{ obj.plano.nome }}<small>R$ {{ obj.plano.valor_mensal }} / {{ obj.plano.periodicidade }}</small></td>
+<td><span class="badge badge-{{ obj.status|lower }}">{{ obj.status }}</span>{% if obj.cortesia %}<small class="bonus-label">Bonificada {{ 'até ' ~ obj.cortesia_ate.strftime('%d/%m/%Y') if obj.cortesia_ate else 'sem prazo' }}</small>{% else %}<small>{{ 'Cobrança habilitada' if obj.asaas_habilitado else 'Sem cobrança habilitada' }}</small>{% endif %}</td>
+<td>{{ obj.data_proxima_cobranca.strftime('%d/%m/%Y') if obj.data_proxima_cobranca else '—' }}</td>
+<td class="subscription-actions-cell">{% include 'subscription_actions.html' %}<div class="quick-actions secondary-actions"><a class="button" href="{{ url_for('admin.subscription',identifier=obj.id) }}#cobranca">{{ 'Ver bonificação' if obj.cortesia else 'Cobranças' }}</a><a class="button" href="{{ url_for('admin.subscription',identifier=obj.id) }}">Detalhes / histórico</a></div></td>
+</tr>{% else %}<tr><td colspan="5">Nenhuma assinatura.</td></tr>{% endfor %}</tbody></table>{% include 'pagination.html' %}</section>
+{% endblock %}

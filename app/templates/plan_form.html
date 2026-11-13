@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block content %}<section class="card"><form method="post" id="plan-catalog-form" class="form-grid">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<label>Produto<select name="produto_id" id="plan-product" required {% if obj or not products %}disabled{% endif %}>{% for product in products %}<option value="{{ product.id }}" data-code="{{ product.codigo }}" {% if product.id == selected_product %}selected{% endif %}>{{ product.nome }}</option>{% else %}<option value="">Nenhum produto disponível</option>{% endfor %}</select></label>
+{% if obj %}<input type="hidden" name="produto_id" value="{{ obj.produto_id }}">{% endif %}
+{% if not obj %}<label id="commercial-tier-field" {% if not selected_commercial %}hidden{% endif %}>Categoria do plano<select name="categoria_comercial" id="commercial-tier" {% if not selected_commercial %}disabled{% else %}required{% endif %}><option value="">Selecione</option>{% for code,label in tiers %}<option value="{{ code }}">{{ label }}</option>{% endfor %}</select></label>{% endif %}
+<label>Nome do plano<input name="nome" required maxlength="150" value="{{ obj.nome if obj else '' }}" placeholder="Ex.: Básico"></label>
+<label>Periodicidade<select name="periodicidade" {% if obj %}disabled{% endif %}><option value="mensal" {% if not obj or obj.periodicidade == 'mensal' %}selected{% endif %}>Mensal</option><option value="anual" {% if obj and obj.periodicidade == 'anual' %}selected{% endif %}>Anual</option></select></label>
+{% if obj %}<input type="hidden" name="periodicidade" value="{{ obj.periodicidade }}">{% endif %}
+<label>Preço por ciclo (R$)<input type="number" name="valor_mensal" step="0.01" min="0" value="{{ obj.valor_mensal if obj else '0.00' }}" required></label>
+{% for name,label in [('limite_usuarios','Limite de usuários'),('limite_registros','Limite de registros'),('limite_armazenamento_mb','Armazenamento (MB)')] %}<label>{{ label }}<input type="number" min="0" name="{{ name }}" value="{{ obj|attr(name) if obj and obj|attr(name) is not none else '' }}" placeholder="Não definido"></label>{% endfor %}
+<label>Descrição<textarea name="descricao" maxlength="5000">{{ obj.descricao or '' if obj else '' }}</textarea></label>
+<label><input type="checkbox" name="ativo" {% if not obj or obj.ativo %}checked{% endif %}> Plano ativo</label>
+<details><summary>Outros limites</summary><label>Limites personalizados (JSON)<textarea name="limite_personalizado_json">{{ (obj.limite_personalizado_json if obj else {})|tojson }}</textarea></label></details>
+<p>O código de integração é definido automaticamente. Para o Comercial, selecione a categoria e o ciclo.</p>
+{% if not products %}<p role="status">Cadastre um produto ativo antes de criar o plano.</p>{% endif %}
+<div class="actions"><button class="primary" {% if not products %}disabled{% endif %}>Salvar plano</button><a href="{{ url_for('admin.listing',kind='planos') }}">Voltar</a></div>
+</form></section>
+{% if obj and obj.produto.permite_modulos %}
+<section class="card"><h2>Módulos incluídos no plano</h2><form method="post" action="{{ url_for('admin.plan_modules',identifier=obj.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+{% for module in obj.produto.modulos if module.ativo %}<label><input type="checkbox" name="modulo_id" value="{{ module.id }}" {% if module.id in included_modules %}checked{% endif %}>{{ module.nome }}</label>{% else %}<p role="status">Nenhum módulo ativo neste produto.</p>{% endfor %}
+<p>Composição aplicada nas próximas contratações ou trocas de plano.</p><button>Salvar composição de módulos</button></form></section>
+{% endif %}{% endblock %}

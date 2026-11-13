@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+{% block content %}<section class="card">
+<form method="post" class="form-grid" id="new-subscription-form">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<label>Cliente<select name="cliente_id" required {% if not clientes %}disabled{% endif %}>{% for obj in clientes %}<option value="{{ obj.id }}">{{ obj.razao_social }}</option>{% else %}<option value="">Nenhum cliente ativo</option>{% endfor %}</select>{% if not clientes %}<small role="status">Cadastre ou ative um cliente para criar a assinatura.</small>{% endif %}</label>
+<label>Produto<select name="produto_id" required {% if not produtos %}disabled{% endif %}>{% for obj in produtos %}<option value="{{ obj.id }}">{{ obj.nome }}</option>{% else %}<option value="">Nenhum produto ativo</option>{% endfor %}</select></label>
+<label>Plano<select name="plano_id" required aria-describedby="subscription-plan-feedback">{% for obj in planos %}<option value="{{ obj.id }}" data-product="{{ obj.produto_id }}">{{ obj.nome }} · R$ {{ obj.valor_mensal }} / {{ obj.periodicidade }}</option>{% endfor %}</select><small id="subscription-plan-feedback" role="status" hidden>Este produto não possui plano ativo. Cadastre ou ative um plano antes de criar a assinatura.</small></label>
+<label>Status<select name="status"><option>TRIAL</option><option>ATIVA</option></select></label>
+<label>Início<input type="date" name="data_inicio"></label><label>Fim<input type="date" name="data_fim"></label><label>Próxima cobrança<input type="date" name="data_proxima_cobranca"></label>
+<button class="primary" id="create-subscription-button" data-prerequisites="{{ 'true' if clientes and produtos else 'false' }}" {% if not clientes or not produtos or not planos %}disabled{% endif %}>Criar assinatura</button>
+</form></section>{% endblock %}

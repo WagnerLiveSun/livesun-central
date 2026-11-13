@@ -1,0 +1,41 @@
+envVarGroups:
+  - name: livesun-central-secrets
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: SECRET_KEY
+      - key: JWT_SECRET
+      - key: ENCRYPTION_KEY
+      - key: DB_ENGINE
+        value: postgresql
+      - key: DATABASE_URL
+      - key: RATELIMIT_STORAGE_URI
+      - key: WEBHOOK_ALLOWED_HOSTS
+        value: propostas.livesun.com.br,app.livesun.com.br
+      - key: WEBHOOK_ALLOW_LOCAL_HTTP
+        value: 'false'
+      - key: TRUST_PROXY
+        value: 'true'
+services:
+  - type: web
+    name: livesun-central
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r requirements.lock.txt
+    autoDeployTrigger: 'off'
+    preDeployCommand: flask --app wsgi db upgrade && flask --app wsgi seed
+    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 2 --threads 4 --access-logfile /dev/null wsgi:app
+    healthCheckPath: /api/v1/health
+    envVars:
+      - fromGroup: livesun-central-secrets
+  - type: worker
+    name: livesun-central-worker
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r requirements.lock.txt
+    autoDeployTrigger: 'off'
+    startCommand: flask --app wsgi worker
+    envVars:
+      - fromGroup: livesun-central-secrets

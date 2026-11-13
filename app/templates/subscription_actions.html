@@ -1,0 +1,33 @@
+{% set role = current_user.perfil %}
+{% if obj.status != 'EXCLUIDA' and role in ['superadmin','comercial','financeiro','suporte'] %}
+<div class="quick-actions" aria-label="Ações de {{ obj.cliente.razao_social }}">
+{% for status,label,tone in [('ATIVA','Ativar' if obj.status == 'TRIAL' else 'Reativar','success'),('SUSPENSA','Suspender','warning'),('BLOQUEADA','Bloquear','danger'),('CANCELADA','Cancelar','muted'),('EXCLUIDA','Excluir','danger')] %}
+{% if status != obj.status and (role in ['superadmin','comercial'] or (role == 'financeiro' and status == 'SUSPENSA') or (role == 'suporte' and status in ['SUSPENSA','BLOQUEADA'])) and (obj.status not in ['CANCELADA','EXPIRADA'] or status in ['ATIVA','EXCLUIDA']) %}
+<button type="button" class="action-{{ tone }}" data-dialog="status-{{ obj.id }}-{{ status }}" data-status="{{ status }}">{{ label }}</button>
+<dialog id="status-{{ obj.id }}-{{ status }}" class="action-dialog">
+  <form method="post" action="{{ url_for('admin.subscription_action',identifier=obj.id,action='status') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="status" value="{{ status }}"><input type="hidden" name="retorno" value="{{ 'painel' if panel_view else 'detalhe' }}">
+    <h2>{{ label }} assinatura</h2><p>{{ obj.cliente.razao_social }} · {{ obj.produto.nome }}</p>
+    {% if status == 'EXCLUIDA' %}<p>Acesso encerrado. Os dados deste produto entram em retenção de 60 dias antes da purga.</p>{% endif %}
+    <label>Motivo<select name="motivo"><option>Solicitação do cliente</option><option>Ajuste comercial autorizado</option><option>Inadimplência</option><option>Pagamento regularizado</option><option>Encerramento contratual</option></select></label>
+    <div class="actions"><button type="button" data-close-dialog>Voltar</button><button class="primary">Confirmar {{ label|lower }}</button></div>
+  </form>
+</dialog>
+{% endif %}{% endfor %}
+{% if role in ['superadmin','comercial'] and obj.status not in ['CANCELADA','EXPIRADA'] %}
+{% if obj.produto.permite_multiplos_planos %}
+{% set alternatives = obj.produto.planos|selectattr('ativo')|rejectattr('id','equalto',obj.plano_id)|list %}
+<button type="button" data-dialog="plano-{{ obj.id }}">Alterar plano</button>
+<dialog id="plano-{{ obj.id }}" class="action-dialog"><form method="post" action="{{ url_for('admin.subscription_action',identifier=obj.id,action='plano') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="retorno" value="{{ 'painel' if panel_view else 'detalhe' }}">
+<h2>Alterar plano</h2><p>{{ obj.cliente.razao_social }} · {{ obj.produto.nome }}</p><p>Plano atual: <strong>{{ obj.plano.nome }}</strong></p>
+<label>Novo plano<select name="plano_id" required {% if not alternatives %}disabled{% endif %}>
+{% for plan in alternatives %}<option value="{{ plan.id }}">{{ plan.nome }} · R$ {{ plan.valor_mensal }} / {{ plan.periodicidade }}</option>{% else %}<option value="">Nenhum outro plano ativo</option>{% endfor %}</select></label>
+{% if alternatives %}<p>Aplicação imediata.</p>{% else %}<p role="status">Este produto não possui outro plano ativo para troca. O plano atual não aparece como destino.</p><a class="button" href="{{ url_for('admin.edit',kind='planos',produto=obj.produto_id) }}">Cadastrar outro plano</a><a class="button" href="{{ url_for('admin.listing',kind='planos',produto=obj.produto_id) }}">Ver planos do produto</a>{% endif %}
+<div class="actions"><button type="button" data-close-dialog>Voltar</button><button class="primary" {% if not alternatives %}disabled{% endif %}>Confirmar plano</button></div>
+</form></dialog>{% endif %}
+<button type="button" data-dialog="bonus-{{ obj.id }}">{{ 'Bonificação' if obj.cortesia else 'Bonificar' }}</button>
+<dialog id="bonus-{{ obj.id }}" class="action-dialog"><h2>Bonificação</h2><p>{{ obj.cliente.razao_social }} · {{ obj.produto.nome }}</p>{% if obj.cortesia %}<p class="badge">Bonificada {{ 'até ' ~ obj.cortesia_ate.strftime('%d/%m/%Y') if obj.cortesia_ate else 'sem prazo' }}</p>{% endif %}<form method="post" action="{{ url_for('admin.commercial_action',identifier=obj.id,action='cortesia') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="retorno" value="{{ 'painel' if panel_view else 'detalhe' }}"><label>Prazo<select name="dias"><option value="0">Sem prazo</option><option value="7">7 dias</option><option value="15">15 dias</option><option value="30">30 dias</option><option value="60">60 dias</option><option value="90">90 dias</option><option value="365">1 ano</option></select></label><label>Motivo<input name="motivo" value="Bonificação comercial autorizada" required maxlength="500"></label><div class="actions"><button type="button" data-close-dialog>Voltar</button><button class="primary" name="liberado" value="true">{{ 'Atualizar bonificação' if obj.cortesia else 'Conceder bonificação' }}</button>{% if obj.cortesia %}<button name="liberado" value="false">Encerrar bonificação</button>{% endif %}</div></form></dialog>
+<button type="button" data-dialog="trial-{{ obj.id }}">Trial</button><dialog id="trial-{{ obj.id }}" class="action-dialog"><form method="post" action="{{ url_for('admin.commercial_action',identifier=obj.id,action='trial') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="retorno" value="{{ 'painel' if panel_view else 'detalhe' }}"><input type="hidden" name="motivo" value="Trial concedido pelo comercial"><h2>Período de teste</h2><p>{{ obj.cliente.razao_social }} · {{ obj.produto.nome }}</p><label>Duração<select name="dias"><option>7</option><option>15</option><option>30</option></select></label><div class="actions"><button type="button" data-close-dialog>Voltar</button><button class="primary">Conceder trial</button></div></form></dialog>
+{% endif %}
+</div>{% endif %}

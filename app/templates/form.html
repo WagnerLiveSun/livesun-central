@@ -1,0 +1,16 @@
+{% extends 'base.html' %}{% block content %}
+{% set blocked_selects = fields|selectattr('type','equalto','select')|rejectattr('choices')|list %}
+<section class="card"><form method="post" class="form-grid">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+{% for field in fields %}<label>{{ field.name|replace('_',' ') }}
+{% if field.type == 'textarea' %}<textarea name="{{ field.name }}" rows="4">{{ field.value }}</textarea>
+{% elif field.type == 'checkbox' %}<input type="checkbox" name="{{ field.name }}" {% if field.value %}checked{% endif %}>
+{% elif field.type == 'select' %}
+<select name="{{ field.name }}" {% if field.required %}required{% endif %} {% if field.locked or not field.choices %}disabled{% endif %}>
+{% for value,label in field.choices %}<option value="{{ value }}" {% if value|string == field.value|string %}selected{% endif %}>{{ label }}</option>{% else %}<option value="">Nenhuma opção disponível</option>{% endfor %}</select>
+{% if field.locked %}<input type="hidden" name="{{ field.name }}" value="{{ field.value }}">{% endif %}
+{% if not field.choices %}<small role="status">Nenhum produto compatível disponível. Cadastre ou habilite um produto que permita módulos.</small>{% endif %}
+{% else %}<input type="{{ field.type }}" name="{{ field.name }}" value="{{ field.value }}" {% if field.required %}required{% endif %} {% if field.locked %}readonly{% endif %} {% if field.type == 'password' %}autocomplete="new-password"{% endif %}>
+{% endif %}</label>{% endfor %}
+<div class="actions"><button class="primary" {% if blocked_selects %}disabled{% endif %}>Salvar</button><a href="{{ url_for('admin.listing',kind=kind) }}">Voltar</a></div>
+</form></section>{% endblock %}

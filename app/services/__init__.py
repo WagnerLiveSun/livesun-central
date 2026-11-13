@@ -1,0 +1,1 @@
+"""Serviços transacionais do domínio comercial."""

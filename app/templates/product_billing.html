@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% block actions %}<a class="button" href="{{ url_for('admin.listing',kind='produtos') }}">Voltar aos produtos</a>{% endblock %}
+{% block content %}
+<section class="card product-heading"><small>PRODUTO</small><h2>{{ product.nome }}</h2>
+<div class="actions"><a class="button" href="{{ url_for('admin.subscriptions',produto=product.id) }}">Assinaturas deste produto</a><a class="button" href="{{ url_for('admin.listing',kind='planos',produto=product.id) }}">Planos e preços</a></div></section>
+{% if current_user.perfil == 'superadmin' %}
+<section class="card"><h2>Configuração de cobrança</h2>
+<p>{{ 'Configurada · ' ~ config.ambiente|capitalize if config else 'Ainda não configurada' }}</p>
+<form method="post" action="{{ url_for('admin.asaas_config') }}" class="form-grid">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="produto_id" value="{{ product.id }}">
+<label>Ambiente<select name="ambiente"><option value="sandbox" {% if config and config.ambiente == 'sandbox' %}selected{% endif %}>Testes</option><option value="producao" {% if config and config.ambiente == 'producao' %}selected{% endif %}>Produção</option></select></label>
+<label>Chave Asaas<input type="password" name="api_key" autocomplete="new-password" {% if not config %}required{% endif %} placeholder="{{ 'Vazio mantém a chave atual' if config else '' }}"></label>
+<label>Token de recebimento<input type="password" name="webhook_token" autocomplete="new-password" {% if not config %}required{% endif %} placeholder="{{ 'Vazio mantém o token atual' if config else '' }}"></label>
+<label><input type="checkbox" name="ativo" {% if config and config.ativo %}checked{% endif %}> Cobrança habilitada para configuração</label>
+<label><input type="checkbox" name="confirmacao" value="PRODUCAO"> Confirmo uso de produção, se selecionado</label>
+<div class="actions"><button class="primary">Salvar configuração do produto</button></div></form>
+{% if config %}<form method="post" action="{{ url_for('admin.test_asaas',identifier=config.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="produto_id" value="{{ product.id }}"><button>Testar conexão</button></form>{% endif %}
+<details><summary>Endereço de recebimento do Asaas</summary><p><code>{{ request.url_root.rstrip('/') }}/api/v1/webhooks/asaas/{{ config.ambiente if config else 'sandbox' }}</code></p></details>
+</section>{% endif %}
+<section class="card"><h2>Assinaturas e cobrança</h2><div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Plano</th><th>Valor / ciclo</th><th>Condição</th><th>Ações</th></tr></thead><tbody>{% for obj in subscriptions %}<tr><td>{{ obj.cliente.razao_social }}</td><td>{{ obj.plano.nome }}</td><td>R$ {{ obj.plano.valor_mensal }} / {{ obj.plano.periodicidade }}</td><td>{{ 'Bonificada' if obj.cortesia else 'Cobrança habilitada' if obj.asaas_habilitado else 'Sem cobrança habilitada' }}</td><td><a class="button" href="{{ url_for('admin.subscription',identifier=obj.id) }}#cobranca">{{ 'Ver bonificação' if obj.cortesia else 'Gerenciar cobrança' }}</a></td></tr>{% else %}<tr><td colspan="5">Nenhuma assinatura cadastrada.</td></tr>{% endfor %}</tbody></table></div></section>
+{% endblock %}

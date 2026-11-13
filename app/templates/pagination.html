@@ -1,0 +1,1 @@
+<nav class="pagination" aria-label="Paginação">{% if page.has_prev %}<a href="{{ request.path }}?{{ dict(request.args, page=page.prev_num)|urlencode }}">Anterior</a>{% endif %}<span>Página {{ page.page }} · {{ page.total }} registros</span>{% if page.has_next %}<a href="{{ request.path }}?{{ dict(request.args, page=page.next_num)|urlencode }}">Próxima</a>{% endif %}</nav>
