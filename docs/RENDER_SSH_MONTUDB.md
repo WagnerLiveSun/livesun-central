@@ -4,11 +4,18 @@
 
 1. Serviço `srv-dbrhj7mc6qcc73dufc9g`: Git `WagnerLiveSun/livesun-central`, branch `publicacao-render`, raiz vazia.
 2. Em Settings → Build/Source, selecione runtime **Docker** e Dockerfile `./Dockerfile`. Não use os comandos antigos de runtime Python.
-3. Pre-deploy: `python scripts/with_ssh_tunnel.py prepare`.
+3. Plano **Free**: deixe **Pre-deploy Command vazio**. O modo `web` executa migrations/seed após confirmar o túnel e antes de iniciar Gunicorn. Não execute migrations no build.
 4. Docker Command: `python scripts/with_ssh_tunnel.py web`.
 5. Health: `/api/v1/health`. Mantenha deploy manual durante homologação.
-6. Mantenha o Secret File **SKey** em `/etc/secrets/SKey`. Não cole a chave em Environment, Git, logs ou chat. O Docker não inclui esse arquivo; o Render deve montá-lo em runtime e pré-deploy.
-7. No worker, use o mesmo runtime, Git, Environment e Secret File SKey, mas Docker Command `python scripts/with_ssh_tunnel.py worker`. O túnel do web não é compartilhado com worker/pré-deploy: cada processo abre o próprio.
+6. Mantenha o Secret File **SKey** em `/etc/secrets/SKey`. Não cole a chave em Environment, Git, logs ou chat. O Docker não inclui esse arquivo; o Render deve montá-lo em runtime.
+7. O manifesto cria somente o web Free, sem serviço pago. Render não oferece Background Worker gratuito. Se houver worker em outra infraestrutura ou plano pago, use o mesmo código, Environment e Secret File SKey, com `python scripts/with_ssh_tunnel.py worker`. Cada serviço abre o próprio túnel.
+
+### Limitações do Free
+
+- O serviço suspende após 15 minutos sem tráfego de entrada; SSH/banco não substituem tráfego de entrada. Não há garantia de operação contínua.
+- **Apenas a API será iniciada.** Filas de webhooks, recuperação, cobranças Asaas, cadastro e purga dependem do worker e não serão processadas automaticamente sem ele. Não considere as integrações assíncronas homologadas apenas por a API responder.
+- A preparação roda em cada inicialização do web, inclusive após suspensão, uma vez por supervisor (não por worker Gunicorn nem reconexão SSH). Se falhar, a API não inicia. Reserve tempo de inicialização para túnel e migrations; não execute instâncias concorrentes migrando o mesmo banco.
+- O plano Free serve para homologação, não para garantir a operação de produção. Esta alteração não inicia cobranças/purgas em background.
 
 ## Environment
 
@@ -44,12 +51,12 @@ A chave montada pode ser somente leitura/permissões amplas: o supervisor a copi
 
 ## Operação
 
-- Aplicação só inicia após túnel SSH e `SELECT 1` no banco confirmados.
+- API só inicia após túnel SSH, `SELECT 1` e migrations/seed concluídos com sucesso.
 - Queda de SSH tenta reconectar com backoff; conexões SQLAlchemy usam pool_pre_ping. Se não recuperar dentro do prazo, o supervisor encerra a aplicação com erro para a plataforma detectar; não libera acesso por falha de assinatura.
 - SIGTERM/SIGINT encerra aplicação, workers filhos e SSH.
-- Pré-deploy executa migrations/seed sem apagar tabelas ou recriar banco. Recusa banco sem Alembic ou com tabelas externas.
+- A preparação na inicialização executa migrations/seed sem recriar banco. Recusa banco sem Alembic ou com tabelas externas. Migrations devem ser revisadas antes de publicar.
 - Falha de POST comercial em andamento continua sujeita aos mecanismos de fila/idempotência; túnel não garante ausência de falhas de rede.
-- Logs esperados: `ssh_tunnel_and_database_ready`, `application_started` e, em queda, `ssh_tunnel_disconnected`.
+- Logs esperados: `ssh_tunnel_and_database_ready`, `database_preparation_started`, `database_preparation_completed`, `application_started` e, em queda, `ssh_tunnel_disconnected`.
 
 Se timeout: conferir SKey no serviço certo, autorização de chave opc, firewall SSH 22 para saída do Render (incluindo worker), fingerprint e serviço MontuDB2 na porta 55433. Não apagar tabelas para corrigir conectividade.
 

@@ -40,20 +40,12 @@ services:
   - type: web
     name: livesun-central
     runtime: docker
-    plan: starter
+    plan: free
     dockerfilePath: ./Dockerfile
     autoDeployTrigger: 'off'
-    preDeployCommand: python scripts/with_ssh_tunnel.py prepare
     dockerCommand: python scripts/with_ssh_tunnel.py web
     healthCheckPath: /api/v1/health
     envVars:
       - fromGroup: livesun-central-secrets
-  - type: worker
-    name: livesun-central-worker
-    runtime: docker
-    plan: starter
-    dockerfilePath: ./Dockerfile
-    autoDeployTrigger: 'off'
-    dockerCommand: python scripts/with_ssh_tunnel.py worker
-    envVars:
-      - fromGroup: livesun-central-secrets
+# Free não oferece Background Worker. Filas exigem worker separado;
+# não são ativadas automaticamente no processo web.

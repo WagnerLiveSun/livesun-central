@@ -29,12 +29,15 @@ def test_environment_generation_is_private_and_idempotent(tmp_path, monkeypatch)
 def test_render_manifest_uses_production_hosts_and_manual_deploy():
     source = (ROOT/'render.yaml').read_text(encoding='utf-8')
     assert "autoDeployTrigger: 'off'" in source
-    assert source.count("autoDeployTrigger: 'off'") == 2
+    assert source.count("autoDeployTrigger: 'off'") == 1
     assert 'propostas.livesun.com.br,app.livesun.com.br' in source
     assert 'value: postgresql' in source
-    assert 'scripts/with_ssh_tunnel.py worker' in source
+    assert 'plan: free' in source
+    assert 'preDeployCommand:' not in source
+    assert 'type: worker' not in source
+    assert 'plan: starter' not in source
     assert 'scripts/with_ssh_tunnel.py web' in source
-    assert source.count('runtime: docker') == 2
+    assert source.count('runtime: docker') == 1
 
 
 def test_production_factory_boots_with_shared_rate_limit_configuration():

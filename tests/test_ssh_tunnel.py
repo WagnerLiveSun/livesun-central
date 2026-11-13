@@ -119,3 +119,62 @@ def test_no_secrets_in_docker_context():
     assert '.env.*' in ignored and 'SKey' in ignored and '*.key' in ignored
     docker=(ROOT/'Dockerfile').read_text()
     assert 'openssh-client' in docker and 'USER central' in docker
+
+
+@pytest.mark.parametrize('prepare_result', [0, 1])
+def test_web_prepares_before_gunicorn_and_aborts_on_failure(tmp_path, monkeypatch, prepare_result):
+    env = environment(tmp_path)
+    ssh = Mock()
+    ssh.poll.return_value = None
+    prepare = Mock()
+    prepare.poll.side_effect = [None, prepare_result]
+    web = Mock()
+    web.poll.return_value = 0
+    processes = iter([ssh, prepare, web])
+    commands = []
+    stopped = []
+
+    def popen(args, **kwargs):
+        commands.append(args)
+        return next(processes)
+
+    monkeypatch.setattr(tunnel.shutil, 'which', lambda name: 'ssh')
+    monkeypatch.setattr(tunnel, 'assert_local_port_free', lambda settings: None)
+    monkeypatch.setattr(tunnel.subprocess, 'Popen', popen)
+    monkeypatch.setattr(tunnel, 'database_ready', lambda e: True)
+    monkeypatch.setattr(tunnel.time, 'sleep', lambda duration: None)
+    monkeypatch.setattr(tunnel, 'stop', stopped.append)
+    assert tunnel.supervise('web', env) == prepare_result
+    assert 'render_prepare.py' in commands[1][-1]
+    assert len(commands) == (3 if prepare_result == 0 else 2)
+    if prepare_result == 0:
+        assert 'gunicorn' in commands[2]
+    assert ssh in stopped
+
+
+def test_stop_during_preparation_stops_children_without_starting_web(tmp_path, monkeypatch):
+    env = environment(tmp_path)
+    ssh, prepare = Mock(), Mock()
+    ssh.poll.return_value = prepare.poll.return_value = None
+    commands, stopped, handlers = [], [], {}
+    processes = iter([ssh, prepare])
+
+    def popen(args, **kwargs):
+        commands.append(args)
+        return next(processes)
+
+    def signal_handler(signum, handler):
+        previous = handlers.get(signum, signal.SIG_DFL)
+        handlers[signum] = handler
+        return previous
+
+    monkeypatch.setattr(tunnel.shutil, 'which', lambda name: 'ssh')
+    monkeypatch.setattr(tunnel, 'assert_local_port_free', lambda settings: None)
+    monkeypatch.setattr(tunnel.subprocess, 'Popen', popen)
+    monkeypatch.setattr(tunnel, 'database_ready', lambda e: True)
+    monkeypatch.setattr(tunnel.signal, 'signal', signal_handler)
+    monkeypatch.setattr(tunnel.time, 'sleep', lambda duration: handlers[signal.SIGTERM](signal.SIGTERM, None))
+    monkeypatch.setattr(tunnel, 'stop', stopped.append)
+    assert tunnel.supervise('web', env) == 0
+    assert len(commands) == 2
+    assert stopped == [prepare, ssh]

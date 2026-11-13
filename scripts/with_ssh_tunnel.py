@@ -194,6 +194,8 @@ def supervise(mode, env=None):
     for signum in (signal.SIGTERM, signal.SIGINT):
         previous[signum] = signal.signal(signum, handle_signal)
     ssh = app = None
+    preparing = False
+    prepared = mode != 'web'
     try:
         with tempfile.TemporaryDirectory(prefix='central-ssh-') as folder, tempfile.TemporaryFile() as ssh_errors:
             private_key = secure_key_copy(settings.key_path, Path(folder)/'identity')
@@ -202,8 +204,14 @@ def supervise(mode, env=None):
             failures = 0
             ready = False
             while not stopping:
-                if app is not None and app.poll() is not None:
-                    return app.returncode
+                if app is not None:
+                    exit_code = app.poll()
+                    if exit_code is not None:
+                        if not preparing or exit_code != 0:
+                            return exit_code
+                        app = None
+                        preparing, prepared = False, True
+                        log('database_preparation_completed')
                 if ssh is not None and ssh.poll() is not None:
                     ssh = None
                     if ready:
@@ -226,9 +234,11 @@ def supervise(mode, env=None):
                     log('ssh_tunnel_and_database_ready')
                     if command is None:
                         return 0
-                    if app is None:
-                        app = subprocess.Popen(command, cwd=ROOT, env=env, start_new_session=os.name == 'posix')
-                        log('application_started')
+                if ready and app is None and command is not None:
+                    preparing = not prepared
+                    child_command = command_for('prepare', env) if preparing else command
+                    app = subprocess.Popen(child_command, cwd=ROOT, env=env, start_new_session=os.name == 'posix')
+                    log('database_preparation_started' if preparing else 'application_started')
                 time.sleep(0.5)
             return 0
     finally:

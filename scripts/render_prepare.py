@@ -1,4 +1,4 @@
-"""Pré-deploy executado dentro de túnel autenticado pelo supervisor."""
+"""Migrations/seed antes da API, dentro do túnel autenticado pelo supervisor."""
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -33,5 +33,5 @@ if __name__ == '__main__':
     try:
         sys.exit(main())
     except Exception:
-        print('Pré-deploy interrompido. Confira banco, migrations e variáveis do Central.', file=sys.stderr)
+        print('Preparação interrompida. Confira banco, migrations e variáveis do Central.', file=sys.stderr)
         sys.exit(1)
