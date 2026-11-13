@@ -1,11 +1,44 @@
 from flask import render_template, request, redirect, url_for, flash
 from app.extensions import db
-from app.models import SolicitacaoCadastro, Cliente, Plano
+from app.models import SolicitacaoCadastro, Cliente, Plano, Produto
 from app.security import operator_required
 from app.services.cadastro_service import review
 from app.services.assinatura_service import BusinessError
 from app.services.auditoria_service import audit, snapshot
 from . import admin
+
+
+@admin.get('/empresas-propostas')
+@operator_required('superadmin','comercial','suporte','auditor')
+def propostas_companies():
+    from app.services.empresas_propostas_service import list_companies
+    cursor = request.args.get('apos', default=0, type=int)
+    if cursor is None or not 0 <= cursor <= 2147483647:
+        raise BusinessError('Página de empresas inválida.')
+    rows, next_cursor, error = [], None, None
+    try:
+        rows, next_cursor = list_companies(cursor)
+    except BusinessError as failure:
+        error = str(failure)
+    product = db.session.scalar(db.select(Produto).where(Produto.codigo == 'PROPOSTAS'))
+    registrations = {}
+    if product and rows:
+        identifiers = [str(item['dados']['empresa_id']) for item in rows]
+        registrations = {row.empresa_origem: row for row in db.session.scalars(
+            db.select(SolicitacaoCadastro).where(SolicitacaoCadastro.produto_id == product.id,
+                SolicitacaoCadastro.empresa_origem.in_(identifiers)))}
+    return render_template('propostas_companies.html', title='Empresas do Propostas',
+        rows=rows, next_cursor=next_cursor, error=error, registrations=registrations)
+
+
+@admin.post('/empresas-propostas/<int:identifier>/cadastrar')
+@operator_required('superadmin','comercial')
+def prepare_propostas_company(identifier):
+    from app.services.empresas_propostas_service import prepare_registration
+    row = prepare_registration(identifier)
+    db.session.commit()
+    flash('Dados carregados. Confirme cliente, plano e acesso inicial para cadastrar e vincular. Nenhuma cobrança foi iniciada.', 'success')
+    return redirect(url_for('admin.registration_detail', identifier=row.id))
 
 
 @admin.get('/cadastros-recebidos')

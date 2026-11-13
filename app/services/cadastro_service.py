@@ -148,6 +148,8 @@ def deliver_one():
         url = product.url_producao.rstrip('/') + '/central/cadastros/vincular'
         validate_destination(url)
         data = {**status_payload(row), 'entitlements':effective(subscription)}
+        if product.codigo == 'PROPOSTAS':
+            data['cnpj_cpf'] = row.cnpj_cpf
         raw = json.dumps(data,separators=(',',':'),ensure_ascii=False).encode()
         headers = signed_headers(decrypt(product.webhook_secret), raw)
         headers['X-LiveSun-Event'] = 'CADASTRO_HABILITADO'

@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% block actions %}<a class="button" href="{{ url_for('admin.propostas_companies') }}">Atualizar empresas</a>{% endblock %}
+{% block content %}
+<section class="card">
+  <p>Empresas consultadas diretamente no Propostas. Preparar cadastro não concede acesso nem inicia cobrança.</p>
+  <p>Na confirmação, escolha criar um cliente ou selecionar um cliente existente com o mesmo CPF/CNPJ. O vínculo só estará concluído após confirmação do Propostas.</p>
+  {% if error %}<p class="notice error" role="alert">{{ error }}</p>{% else %}
+  <div class="table-wrap"><table><thead><tr><th>ID no Propostas</th><th>Empresa</th><th>CPF/CNPJ</th><th>E-mail</th><th>Situação</th><th>Ação</th></tr></thead><tbody>
+  {% for item in rows %}{% set company=item.dados %}{% set registration=registrations.get(company.empresa_id|string) %}
+  <tr><td>{{ company.empresa_id }}</td><td>{{ company.razao_social }}<small>{{ company.nome_fantasia or '' }}</small></td><td>{{ company.cnpj_cpf or 'Não informado' }}</td><td>{{ company.email or 'Não informado' }}</td>
+  <td>{% if item.cliente_id %}Vinculada ao cliente #{{ item.cliente_id }}{% elif registration %}{{ {'PENDENTE':'Aguardando confirmação do operador','VINCULO_PENDENTE':'Aguardando confirmação do Propostas','VINCULADA':'Divergência: vínculo não informado pelo Propostas'}.get(registration.status,registration.status) }}{% elif not item.ativo %}Inativa no Propostas{% else %}Não vinculada{% endif %}</td>
+  <td>{% if registration %}<a class="button" href="{{ url_for('admin.registration_detail',identifier=registration.id) }}">Abrir cadastro</a>{% elif item.ativo and not item.cliente_id and current_user.perfil in ['superadmin','comercial'] %}<form method="post" action="{{ url_for('admin.prepare_propostas_company',identifier=company.empresa_id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button>Cadastrar cliente e vincular</button></form>{% else %}—{% endif %}</td></tr>
+  {% else %}<tr><td colspan="6">Nenhuma empresa nesta página.</td></tr>{% endfor %}
+  </tbody></table></div>
+  {% if next_cursor %}<a class="button" href="{{ url_for('admin.propostas_companies',apos=next_cursor) }}">Próxima página</a>{% endif %}
+  {% endif %}
+</section>
+{% endblock %}
