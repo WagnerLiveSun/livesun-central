@@ -6,6 +6,12 @@
 - Serviço web existente: `srv-dbrhj7mc6qcc73dufc9g`
 - URL: `https://livesun-central.onrender.com`
 
+## Situação da preparação
+
+Código enviado à branch `publicacao-render`, sem alterar `main`. O serviço existente não foi administrado nem teve seu Environment alterado por esta sessão: não há credencial de administração Render disponível. Escolha conscientemente essa branch no serviço somente após completar banco remoto, Redis e segredos. O teste público de health não confirmou aplicação saudável nesta preparação.
+
+101 testes locais passaram. `.env`, `.env.postgresql` e `.env.render` foram conferidos como ignorados; a preparação para Git verificou padrões de credenciais sem encontrar arquivos bloqueados. Isso não substitui revisão de segurança antes da ativação em produção.
+
 Publique somente a pasta `livesun-central` como raiz do repositório. Não publique a pasta superior: ela contém backups e outros arquivos locais. Não publique `.env`, `.env.postgresql`, `.env.render`, certificados ou dumps.
 
 ## Pré-requisitos
