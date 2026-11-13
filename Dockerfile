@@ -11,4 +11,4 @@ RUN pip install --no-cache-dir -r requirements.lock.txt
 COPY --chown=central:central . /app
 USER central
 EXPOSE 10000
-CMD ["python", "scripts/with_ssh_tunnel.py", "web"]
+CMD ["python", "scripts/with_ssh_tunnel.py", "web-worker"]

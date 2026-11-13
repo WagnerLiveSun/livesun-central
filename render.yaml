@@ -42,9 +42,8 @@ services:
     plan: free
     dockerfilePath: ./Dockerfile
     autoDeployTrigger: 'off'
-    dockerCommand: python scripts/with_ssh_tunnel.py web
+    dockerCommand: python scripts/with_ssh_tunnel.py web-worker
     healthCheckPath: /api/v1/health
     envVars:
       - fromGroup: livesun-central-secrets
-# Free não oferece Background Worker. Filas exigem worker separado;
-# não são ativadas automaticamente no processo web.
+# Um serviço Free, com web e worker supervisionados e túnel compartilhado.

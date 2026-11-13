@@ -37,7 +37,7 @@ def test_render_manifest_uses_production_hosts_and_manual_deploy():
     assert 'preDeployCommand:' not in source
     assert 'type: worker' not in source
     assert 'plan: starter' not in source
-    assert 'scripts/with_ssh_tunnel.py web' in source
+    assert 'scripts/with_ssh_tunnel.py web-worker' in source
     assert source.count('runtime: docker') == 1
     assert 'key: RATELIMIT_STORAGE_URI' not in source
 

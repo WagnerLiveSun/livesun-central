@@ -5,17 +5,17 @@
 1. Serviço `srv-dbrhj7mc6qcc73dufc9g`: Git `WagnerLiveSun/livesun-central`, branch `publicacao-render`, raiz vazia.
 2. Em Settings → Build/Source, selecione runtime **Docker** e Dockerfile `./Dockerfile`. Não use os comandos antigos de runtime Python.
 3. Plano **Free**: deixe **Pre-deploy Command vazio**. O modo `web` executa migrations/seed após confirmar o túnel e antes de iniciar Gunicorn. Não execute migrations no build.
-4. Docker Command: `python scripts/with_ssh_tunnel.py web`.
+4. Docker Command: `python scripts/with_ssh_tunnel.py web-worker`.
 5. Health: `/api/v1/health`. Mantenha deploy manual durante homologação.
 6. Mantenha o Secret File **SKey** em `/etc/secrets/SKey`. Não cole a chave em Environment, Git, logs ou chat. O Docker não inclui esse arquivo; o Render deve montá-lo em runtime.
-7. O manifesto cria somente o web Free, sem serviço pago. Render não oferece Background Worker gratuito. Se houver worker em outra infraestrutura ou plano pago, use o mesmo código, Environment e Secret File SKey, com `python scripts/with_ssh_tunnel.py worker`. Cada serviço abre o próprio túnel.
+7. O manifesto cria somente um serviço web Free, sem serviço pago adicional. O modo `web-worker` inicia Gunicorn e um processo Flask worker após migrations/seed; ambos usam o mesmo túnel e Environment. Se Docker Command estiver sobrescrito manualmente no Dashboard, atualize-o para `web-worker`; mudar somente o Dockerfile não substitui esse campo. O modo `web` continua disponível para API isolada; `worker` para serviço separado. Não execute outro worker sem necessidade.
 
 ### Limitações do Free
 
 - O serviço suspende após 15 minutos sem tráfego de entrada; SSH/banco não substituem tráfego de entrada. Não há garantia de operação contínua.
-- **Apenas a API será iniciada.** Filas de webhooks, recuperação, cobranças Asaas, cadastro e purga dependem do worker e não serão processadas automaticamente sem ele. Não considere as integrações assíncronas homologadas apenas por a API responder.
+- API e worker funcionam enquanto a instância estiver ativa, compartilhando CPU/memória. Ao suspender, ambos param. Ao iniciar novamente, o worker consulta filas persistidas no PostgreSQL e usa os mecanismos existentes de recuperação/lease; não há garantia de execução contínua ou horário exato.
 - A preparação roda em cada inicialização do web, inclusive após suspensão, uma vez por supervisor (não por worker Gunicorn nem reconexão SSH). Se falhar, a API não inicia. Reserve tempo de inicialização para túnel e migrations; não execute instâncias concorrentes migrando o mesmo banco.
-- O plano Free serve para homologação, não para garantir a operação de produção. Esta alteração não inicia cobranças/purgas em background.
+- O plano Free não garante operação contínua de produção. Ao ativar `web-worker`, o worker existente processará tarefas elegíveis já persistidas: webhooks, cadastros, manutenção de cobranças/Asaas e purgas previamente agendadas. Não são criadas novas autorizações comerciais, nem alteradas regras de bônus/purga por produto. Confira filas e credenciais antes do deploy; testes usam mocks e não executam cobranças/purgas reais.
 
 ## Environment
 
@@ -59,10 +59,10 @@ A chave montada pode ser somente leitura/permissões amplas: o supervisor a copi
 
 - API só inicia após túnel SSH, `SELECT 1` e migrations/seed concluídos com sucesso.
 - Queda de SSH tenta reconectar com backoff; conexões SQLAlchemy usam pool_pre_ping. Se não recuperar dentro do prazo, o supervisor encerra a aplicação com erro para a plataforma detectar; não libera acesso por falha de assinatura.
-- SIGTERM/SIGINT encerra aplicação, workers filhos e SSH.
+- SIGTERM/SIGINT encerra web, worker e SSH. Se o worker sair (mesmo código zero), o supervisor encerra o conjunto com erro; se a API sair, encerra worker/túnel. O worker não é iniciado dentro de cada processo Gunicorn nem duplicado em reconexões SSH.
 - A preparação na inicialização executa migrations/seed sem recriar banco. Recusa banco sem Alembic ou com tabelas externas. Migrations devem ser revisadas antes de publicar.
 - Falha de POST comercial em andamento continua sujeita aos mecanismos de fila/idempotência; túnel não garante ausência de falhas de rede.
-- Logs esperados: `ssh_tunnel_and_database_ready`, `database_preparation_started`, `database_preparation_completed`, `application_started` e, em queda, `ssh_tunnel_disconnected`.
+- Logs esperados: `ssh_tunnel_and_database_ready`, `database_preparation_started`, `database_preparation_completed`, `application_started`, `worker_started` e, em queda, `ssh_tunnel_disconnected` ou `worker_exited`.
 - A preparação registra `preparation_stage_started` e, em falha, `preparation_stage_failed` com `stage` e orientação fixa, sem valores de Environment nem texto de exceções. Estágios distinguem chaves ausentes, configuração de produção/Redis, chave Fernet, criação da aplicação, schema, migrations, seeds e bootstrap do administrador.
 - Uma falha de preparação não significa falha SSH: `ssh_tunnel_and_database_ready` confirma que SSH e SELECT 1 funcionaram naquela tentativa. Se surgir porta ocupada, não mate processos desconhecidos nem desative a verificação. O teste de porta em Linux permite TIME_WAIT, mas continua recusando listeners ativos; o encerramento tenta parar SSH mesmo se parar o filho falhar.
 

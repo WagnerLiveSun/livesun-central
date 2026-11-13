@@ -82,7 +82,7 @@ class Settings:
 
 
 def command_for(mode, env):
-    if mode == 'web':
+    if mode in ('web', 'web-worker'):
         http_port = port(env.get('PORT', '10000'))
         return [sys.executable, '-m', 'gunicorn', '--bind', f'0.0.0.0:{http_port}',
                 '--workers', '1', '--threads', '4', '--timeout', '60', 'wsgi:app']
@@ -197,9 +197,9 @@ def supervise(mode, env=None):
     previous = {}
     for signum in (signal.SIGTERM, signal.SIGINT):
         previous[signum] = signal.signal(signum, handle_signal)
-    ssh = app = None
+    ssh = app = worker = None
     preparing = False
-    prepared = mode != 'web'
+    prepared = mode not in ('web', 'web-worker')
     try:
         with tempfile.TemporaryDirectory(prefix='central-ssh-') as folder, tempfile.TemporaryFile() as ssh_errors:
             private_key = secure_key_copy(settings.key_path, Path(folder)/'identity')
@@ -208,6 +208,10 @@ def supervise(mode, env=None):
             failures = 0
             ready = False
             while not stopping:
+                if worker is not None and worker.poll() is not None:
+                    log('worker_exited')
+                    # Worker é contínuo: até saída zero exige reiniciar o conjunto.
+                    return worker.returncode or 1
                 if app is not None:
                     exit_code = app.poll()
                     if exit_code is not None:
@@ -243,6 +247,10 @@ def supervise(mode, env=None):
                     child_command = command_for('prepare', env) if preparing else command
                     app = subprocess.Popen(child_command, cwd=ROOT, env=env, start_new_session=os.name == 'posix')
                     log('database_preparation_started' if preparing else 'application_started')
+                    if mode == 'web-worker' and not preparing and worker is None:
+                        worker = subprocess.Popen(command_for('worker', env), cwd=ROOT,
+                            env=env, start_new_session=os.name == 'posix')
+                        log('worker_started')
                 time.sleep(0.5)
             return 0
     finally:
@@ -250,7 +258,11 @@ def supervise(mode, env=None):
             stop(app)
         finally:
             try:
-                stop(ssh)
+                try:
+                    if worker is not None:
+                        stop(worker)
+                finally:
+                    stop(ssh)
             finally:
                 for signum, handler in previous.items():
                     signal.signal(signum, handler)
@@ -258,7 +270,7 @@ def supervise(mode, env=None):
 
 def main():
     parser = argparse.ArgumentParser(description='Central com túnel SSH privado MontuDB.')
-    parser.add_argument('mode', choices=('prepare', 'web', 'worker', 'check'))
+    parser.add_argument('mode', choices=('prepare', 'web', 'web-worker', 'worker', 'check'))
     args = parser.parse_args()
     try:
         return supervise(args.mode)
