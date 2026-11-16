@@ -1,0 +1,23 @@
+<section class="card">
+  <h2>Conferir assinatura legada do Comercial</h2>
+  {% if legacy_preview and legacy_preview.assinatura %}{% set old=legacy_preview.assinatura %}
+  <dl><dt>Plano / periodicidade</dt><dd>{{ old.plano }} / {{ old.periodicidade }}</dd>
+    <dt>Situação original</dt><dd>{{ old.status }}</dd><dt>Início / vencimento</dt><dd>{{ old.data_inicio }} / {{ old.data_vencimento }}</dd>
+    <dt>Fim do trial</dt><dd>{{ old.trial_ate or 'Não se aplica' }}</dd>
+    <dt>Bonificação</dt><dd>{{ ('Até ' ~ old.bonificacao_ate if old.bonificacao_ate else 'Sem prazo final') if old.bonificada else 'Não' }}</dd>
+    <dt>Preço da oferta</dt><dd>{{ old.preco if old.preco is not none else 'Não informado na origem: confira expressamente o preço do plano selecionado' }}</dd>
+    <dt>Limite de usuários</dt><dd>{{ old.usuarios }}</dd></dl>
+  {% endif %}
+  {% if legacy_error %}<p class="notice error" role="alert">{{ legacy_error }}</p>{% endif %}
+  {% if not legacy_error and legacy_hash and current_user.perfil in ['superadmin','comercial'] %}
+  <form method="post" action="{{ url_for('admin.confirm_comercial_company',identifier=row.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="origem_hash" value="{{ legacy_hash }}">
+    <label>Cliente<select name="cliente_id"><option value="">Criar cliente com os dados recebidos</option>{% for customer in customers %}<option value="{{ customer.id }}">{{ customer.razao_social }} · {{ customer.cnpj_cpf or 'Sem documento' }}</option>{% endfor %}</select></label>
+    <label>Plano COMERCIAL correspondente<select name="plano_id" required>{% for plan in plans %}<option value="{{ plan.id }}">{{ plan.nome }} · {{ plan.codigo }} · R$ {{ plan.valor_mensal }} / {{ plan.periodicidade }}</option>{% else %}<option value="">Cadastre um plano ativo correspondente</option>{% endfor %}</select></label>
+    <label>Justificativa<input name="motivo" minlength="3" maxlength="500" required></label>
+    <label><input type="checkbox" name="confirmacao" value="CONFERIDO" required> Conferi cliente, plano, preço, datas e bonificação; preservar as condições exibidas.</label>
+    <p>Não inicia cobrança nem ativa o controle de acesso pelo Central. Situações suspensas/canceladas e trials vencidos não são reativados.</p>
+    <button class="primary" {% if not plans %}disabled{% endif %}>Confirmar migração e preparar vínculo</button>
+  </form>
+  {% endif %}
+</section>

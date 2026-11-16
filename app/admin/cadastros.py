@@ -57,7 +57,18 @@ def registration_detail(identifier):
     row=db.get_or_404(SolicitacaoCadastro,identifier)
     customers=db.session.scalars(db.select(Cliente).filter_by(status='ATIVO').order_by(Cliente.razao_social)).all()
     plans=db.session.scalars(db.select(Plano).filter_by(produto_id=row.produto_id,ativo=True)).all()
-    return render_template('registration.html',title='Cadastro · '+row.razao_social,row=row,customers=customers,plans=plans)
+    from app.services.empresas_comercial_service import is_legacy, company, fingerprint, conditions
+    legacy_preview, legacy_hash, legacy_error = None, None, None
+    legacy = is_legacy(row)
+    if legacy and row.status == 'PENDENTE':
+        try:
+            legacy_preview = company(int(row.empresa_origem))
+            legacy_hash = fingerprint(legacy_preview)
+            conditions(legacy_preview)
+        except BusinessError as error:
+            legacy_error = str(error)
+    return render_template('registration.html',title='Cadastro · '+row.razao_social,row=row,customers=customers,plans=plans,
+        legacy=legacy, legacy_preview=legacy_preview, legacy_hash=legacy_hash, legacy_error=legacy_error)
 
 
 @admin.post('/cadastros-recebidos/<int:identifier>/habilitar')

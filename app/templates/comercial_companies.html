@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+{% block actions %}<a class="button" href="{{ url_for('admin.comercial_companies') }}">Atualizar empresas</a>{% endblock %}
+{% block content %}
+<section class="card">
+  <p>Consulta autenticada ao Comercial, sem acesso direto ao MySQL. Mantenha o controle pelo Central desativado até concluir a conferência e os vínculos.</p>
+  <p>Preparar apenas abre a prévia. Nenhum cliente, assinatura, cobrança ou vínculo é criado automaticamente nesta consulta.</p>
+  {% if error %}<p class="notice error" role="alert">{{ error }}</p>{% else %}
+  <div class="table-wrap"><table><thead><tr><th>ID</th><th>Empresa</th><th>CPF/CNPJ</th><th>E-mail</th><th>Assinatura legada</th><th>Vínculo</th><th>Ação</th></tr></thead><tbody>
+  {% for item in rows %}{% set company=item.dados %}{% set registration=registrations.get(company.empresa_id|string) %}
+  <tr><td>{{ company.empresa_id }}</td><td>{{ company.razao_social }}<small>{{ company.nome_fantasia or '' }}</small></td><td>{{ company.cnpj_cpf or 'Não informado' }}</td><td>{{ company.email or 'Não informado' }}</td>
+  <td>{% if item.assinatura %}{{ item.assinatura.plano }} · {{ item.assinatura.status }}<small>{{ item.assinatura.periodicidade }} · {{ 'Bonificada' if item.assinatura.bonificada else 'Sem bonificação' }}</small>{% else %}Sem assinatura: revisar origem{% endif %}</td>
+  <td>{% if item.cliente_id %}Cliente #{{ item.cliente_id }}{% elif registration %}{{ registration.status }}{% else %}Não vinculada{% endif %}</td>
+  <td>{% if registration %}<a class="button" href="{{ url_for('admin.registration_detail',identifier=registration.id) }}">Abrir prévia</a>{% elif item.ativo and not item.cliente_id and current_user.perfil in ['superadmin','comercial'] %}<form method="post" action="{{ url_for('admin.prepare_comercial_company',identifier=company.empresa_id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button>Preparar migração</button></form>{% else %}—{% endif %}</td></tr>
+  {% else %}<tr><td colspan="7">Nenhuma empresa nesta página.</td></tr>{% endfor %}
+  </tbody></table></div>
+  {% if next_cursor %}<a class="button" href="{{ url_for('admin.comercial_companies',apos=next_cursor) }}">Próxima página</a>{% endif %}
+  {% endif %}
+</section>
+{% endblock %}

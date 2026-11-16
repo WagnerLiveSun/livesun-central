@@ -32,20 +32,8 @@ def receive(product, payload):
     return row, True
 
 
-def review(identifier, client_id, plan_id, status, reason):
-    row = db.session.scalar(db.select(SolicitacaoCadastro).where(SolicitacaoCadastro.id == identifier)
-        .with_for_update().execution_options(populate_existing=True))
-    if not row or row.status != 'PENDENTE':
-        raise BusinessError('Solicitação não está pendente de habilitação.')
-    if status not in ('ATIVA', 'TRIAL') or not reason or len(reason.strip()) < 3 or len(reason) > 500:
-        raise BusinessError('Informe acesso inicial e justificativa válidos.')
-    before = snapshot(row)
-    product = db.session.scalar(db.select(Produto).where(Produto.id == row.produto_id).with_for_update())
-    if not product or not product.ativo:
-        raise BusinessError('Produto indisponível.')
-    plan = db.session.get(Plano, plan_id)
-    if not plan or not plan.ativo or plan.produto_id != product.id:
-        raise BusinessError('Selecione um plano ativo deste produto.')
+def resolve_customer(row, client_id):
+    """Mesma proteção contra documento divergente e duplicação em ambos os fluxos."""
     if client_id:
         customer = db.session.get(Cliente, client_id)
         if not customer or customer.status != 'ATIVO':
@@ -68,6 +56,27 @@ def review(identifier, client_id, plan_id, status, reason):
         db.session.add(customer)
         db.session.flush()
         audit(customer, 'CLIENTE_AUTOCADASTRO_HABILITADO')
+    return customer
+
+
+def review(identifier, client_id, plan_id, status, reason):
+    row = db.session.scalar(db.select(SolicitacaoCadastro).where(SolicitacaoCadastro.id == identifier)
+        .with_for_update().execution_options(populate_existing=True))
+    if not row or row.status != 'PENDENTE':
+        raise BusinessError('Solicitação não está pendente de habilitação.')
+    from .empresas_comercial_service import is_legacy
+    if is_legacy(row):
+        raise BusinessError('Use a confirmação do legado Comercial para preservar datas e bonificações.')
+    if status not in ('ATIVA', 'TRIAL') or not reason or len(reason.strip()) < 3 or len(reason) > 500:
+        raise BusinessError('Informe acesso inicial e justificativa válidos.')
+    before = snapshot(row)
+    product = db.session.scalar(db.select(Produto).where(Produto.id == row.produto_id).with_for_update())
+    if not product or not product.ativo:
+        raise BusinessError('Produto indisponível.')
+    plan = db.session.get(Plano, plan_id)
+    if not plan or not plan.ativo or plan.produto_id != product.id:
+        raise BusinessError('Selecione um plano ativo deste produto.')
+    customer = resolve_customer(row, client_id)
     existing = db.session.scalar(db.select(Assinatura).where(Assinatura.cliente_id == customer.id,
         Assinatura.produto_id == product.id, Assinatura.slot_vigente == 1).with_for_update())
     if existing:
@@ -142,14 +151,25 @@ def deliver_one():
     db.session.commit()
     try:
         subscription = row.assinatura
-        if not subscription or subscription.status not in ('ATIVA','TRIAL'):
+        from .empresas_comercial_service import is_legacy
+        legacy = is_legacy(row)
+        if not subscription or (subscription.status not in ('ATIVA','TRIAL') and not legacy):
             raise BusinessError('Assinatura não habilitada para concluir o vínculo.')
         product = row.produto
         url = product.url_producao.rstrip('/') + '/central/cadastros/vincular'
         validate_destination(url)
         data = {**status_payload(row), 'entitlements':effective(subscription)}
-        if product.codigo == 'PROPOSTAS':
+        if product.codigo == 'PROPOSTAS' or legacy:
             data['cnpj_cpf'] = row.cnpj_cpf
+        if legacy:
+            data['origem_legada'] = True
+            from app.models import Auditoria
+            confirmation = db.session.scalar(db.select(Auditoria).where(
+                Auditoria.entidade == 'solicitacoes_cadastro', Auditoria.entidade_id == row.id,
+                Auditoria.acao == 'LEGADO_COMERCIAL_CONFIRMADO').order_by(Auditoria.id.desc()))
+            if not confirmation:
+                raise BusinessError('Confirmação auditada do legado ausente.')
+            data['origem_hash'] = confirmation.novo['hash']
         raw = json.dumps(data,separators=(',',':'),ensure_ascii=False).encode()
         headers = signed_headers(decrypt(product.webhook_secret), raw)
         headers['X-LiveSun-Event'] = 'CADASTRO_HABILITADO'
