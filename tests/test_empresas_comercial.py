@@ -204,3 +204,57 @@ def test_document_matching_and_no_duplicate_subscription(app, commercial):
     with pytest.raises(BusinessError):
         confirm(row, commercial[1], item, customer.id)
     assert db.session.query(Assinatura).count() == 1
+
+
+def test_preview_only_offers_compatible_plan_and_requires_explicit_selection(app, client, commercial):
+    login(client)
+    product, compatible = commercial
+    for code, period, price in [('BASIC','mensal','99.90'), ('PREMIUM_ANUAL','anual','99.90'),
+                                ('PREMIUM_OUTRO','mensal','10.00')]:
+        db.session.add(Plano(produto_id=product.id,codigo=code,nome=code,periodicidade=period,
+                             valor_mensal=price,ativo=True))
+    db.session.commit()
+    item = company()
+    row = prepare(item)
+    with patch.object(service, 'company', return_value=item):
+        response = client.get(f'/cadastros-recebidos/{row.id}')
+    body = response.get_data(as_text=True)
+    assert response.status_code == 200
+    assert f'<option value="{compatible.id}">' in body
+    assert 'Selecione o plano conferido...' in body
+    assert 'PREMIUM_ANUAL' not in body and '>BASIC ·' not in body and 'PREMIUM_OUTRO' not in body
+
+
+def test_preview_explains_missing_plan_before_confirmation(app, client, commercial):
+    login(client)
+    item = company(plano='basic')
+    row = prepare(item)
+    with patch.object(service, 'company', return_value=item):
+        response = client.get(f'/cadastros-recebidos/{row.id}')
+    body = response.get_data(as_text=True)
+    assert 'Nenhum plano compatível no Central para basic / mensal' in body
+    assert 'Conferir planos do Comercial' in body
+    assert 'Confirmar migração e preparar vínculo</button>' not in body
+    assert db.session.query(Assinatura).count() == 0
+
+
+def test_wrong_plan_returns_to_preview_without_partial_writes(app, client, commercial):
+    login(client)
+    item = company()
+    row = prepare(item)
+    plan = Plano(produto_id=commercial[0].id,codigo='BASIC',nome='Básico',periodicidade='mensal',
+                 valor_mensal='99.90',ativo=True)
+    db.session.add(plan)
+    db.session.commit()
+    before = db.session.query(Cliente).count()
+    with patch.object(service, 'company', return_value=item):
+        response = client.post(f'/empresas-comercial/cadastros/{row.id}/confirmar', data={
+            'plano_id':plan.id,'origem_hash':service.fingerprint(item),
+            'confirmacao':'CONFERIDO','motivo':'Conferência de plano'})
+    assert response.status_code == 302
+    assert response.location.endswith(f'/cadastros-recebidos/{row.id}')
+    with client.session_transaction() as session:
+        assert any('premium / mensal' in message and 'BASIC / mensal' in message
+                   for _,message in session.get('_flashes',[]))
+    assert db.session.query(Assinatura).count() == 0
+    assert db.session.query(Cliente).count() == before

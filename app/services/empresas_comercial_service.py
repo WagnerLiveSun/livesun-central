@@ -154,6 +154,23 @@ def conditions(item):
         raise BusinessError('Condições legadas incompletas ou inválidas. Confira a origem antes de confirmar.') from None
 
 
+def plan_mismatch(plan, legacy):
+    """Mesma regra na prévia e na confirmação; não presume categoria pelo nome."""
+    category = str(legacy.get('plano', '')).strip().lower()
+    period = str(legacy.get('periodicidade', '')).strip().lower()
+    if plan.codigo.lower().removesuffix('_anual') != category or plan.periodicidade != period:
+        return (f'A origem exige {category} / {period}; o plano escolhido é '
+                f'{plan.codigo} / {plan.periodicidade}. Selecione ou cadastre o plano correspondente em Planos.')
+    if legacy.get('preco') is not None:
+        try:
+            price = Decimal(legacy['preco'])
+            if not price.is_finite() or price < 0 or price != plan.valor_mensal:
+                raise ValueError()
+        except (InvalidOperation, ValueError):
+            return 'Preço do plano difere da oferta legada. Confira o catálogo antes de migrar.'
+    return None
+
+
 def confirm(identifier, client_id, plan_id, expected_hash, confirmed, reason):
     row = db.session.scalar(db.select(SolicitacaoCadastro).where(SolicitacaoCadastro.id == identifier)
         .with_for_update().execution_options(populate_existing=True))
@@ -173,15 +190,9 @@ def confirm(identifier, client_id, plan_id, expected_hash, confirmed, reason):
     plan = db.session.get(Plano, plan_id)
     if not plan or not plan.ativo or plan.produto_id != row.produto_id:
         raise BusinessError('Selecione um plano ativo do COMERCIAL.')
-    if plan.codigo.lower().removesuffix('_anual') != legacy['plano'] or plan.periodicidade != legacy['periodicidade']:
-        raise BusinessError('Plano e periodicidade devem corresponder à assinatura legada.')
-    if legacy.get('preco') is not None:
-        try:
-            price = Decimal(legacy['preco'])
-            if not price.is_finite() or price < 0 or price != plan.valor_mensal:
-                raise ValueError()
-        except (InvalidOperation, ValueError):
-            raise BusinessError('Preço do plano difere da oferta legada. Confira o catálogo antes de migrar.') from None
+    mismatch = plan_mismatch(plan, legacy)
+    if mismatch:
+        raise BusinessError(mismatch)
     customer = resolve_customer(row, client_id)
     existing = db.session.scalar(db.select(Assinatura).where(Assinatura.cliente_id == customer.id,
         Assinatura.produto_id == row.produto_id).with_for_update())

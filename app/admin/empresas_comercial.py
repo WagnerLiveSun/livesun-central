@@ -7,6 +7,33 @@ from app.services.assinatura_service import BusinessError
 from . import admin
 
 
+@admin.get('/empresas-comercial/planos')
+@operator_required('superadmin', 'comercial', 'suporte', 'auditor')
+def comercial_catalog():
+    from app.services.catalogo_comercial_service import preview
+    catalog, error = None, None
+    try:
+        catalog = preview()
+    except BusinessError as failure:
+        error = str(failure)
+    return render_template('comercial_catalog.html', title='Planos de origem · Comercial', catalog=catalog, error=error)
+
+
+@admin.post('/empresas-comercial/planos/importar')
+@operator_required('superadmin', 'comercial')
+def import_comercial_catalog():
+    from app.services.catalogo_comercial_service import import_selected
+    try:
+        count = import_selected(request.form.get('origem_hash', ''), request.form.getlist('planos'),
+            request.form.get('confirmacao') == 'CONFERIDO')
+        db.session.commit()
+        flash(f'{count} plano(s) criado(s). Planos existentes preservados; nenhuma assinatura ou cobrança criada.', 'success')
+    except BusinessError as failure:
+        db.session.rollback()
+        flash(str(failure), 'warning')
+    return redirect(url_for('admin.comercial_catalog'))
+
+
 @admin.get('/empresas-comercial')
 @operator_required('superadmin', 'comercial', 'suporte', 'auditor')
 def comercial_companies():
@@ -41,8 +68,13 @@ def prepare_comercial_company(identifier):
 @admin.post('/empresas-comercial/cadastros/<int:identifier>/confirmar')
 @operator_required('superadmin', 'comercial')
 def confirm_comercial_company(identifier):
-    row = service.confirm(identifier, request.form.get('cliente_id', type=int), request.form.get('plano_id', type=int),
-        request.form.get('origem_hash', ''), request.form.get('confirmacao') == 'CONFERIDO', request.form.get('motivo', ''))
+    try:
+        row = service.confirm(identifier, request.form.get('cliente_id', type=int), request.form.get('plano_id', type=int),
+            request.form.get('origem_hash', ''), request.form.get('confirmacao') == 'CONFERIDO', request.form.get('motivo', ''))
+    except BusinessError as error:
+        db.session.rollback()
+        flash(str(error), 'warning')
+        return redirect(url_for('admin.registration_detail', identifier=identifier))
     db.session.commit()
     flash('Condições legadas preservadas no Central. Aguarde a confirmação do vínculo pelo Comercial; controle continua separado da ativação.', 'success')
     return redirect(url_for('admin.registration_detail', identifier=row.id))

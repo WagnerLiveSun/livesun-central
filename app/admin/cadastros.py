@@ -57,7 +57,7 @@ def registration_detail(identifier):
     row=db.get_or_404(SolicitacaoCadastro,identifier)
     customers=db.session.scalars(db.select(Cliente).filter_by(status='ATIVO').order_by(Cliente.razao_social)).all()
     plans=db.session.scalars(db.select(Plano).filter_by(produto_id=row.produto_id,ativo=True)).all()
-    from app.services.empresas_comercial_service import is_legacy, company, fingerprint, conditions
+    from app.services.empresas_comercial_service import is_legacy, company, fingerprint, conditions, plan_mismatch
     legacy_preview, legacy_hash, legacy_error = None, None, None
     legacy = is_legacy(row)
     if legacy and row.status == 'PENDENTE':
@@ -65,6 +65,12 @@ def registration_detail(identifier):
             legacy_preview = company(int(row.empresa_origem))
             legacy_hash = fingerprint(legacy_preview)
             conditions(legacy_preview)
+            plans = [plan for plan in plans if not plan_mismatch(plan, legacy_preview['assinatura'])]
+            if not plans:
+                old = legacy_preview['assinatura']
+                legacy_error = (f'Nenhum plano compatível no Central para {old["plano"]} / {old["periodicidade"]}. '
+                    'Use Trazer planos da origem para consultar e importar o catálogo do Comercial, incluindo o preço quando informado na origem. '
+                    'Não altere a assinatura legada para contornar esta conferência.')
         except BusinessError as error:
             legacy_error = str(error)
     return render_template('registration.html',title='Cadastro · '+row.razao_social,row=row,customers=customers,plans=plans,

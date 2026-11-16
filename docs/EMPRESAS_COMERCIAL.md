@@ -20,6 +20,18 @@ Este fluxo nao modifica lancamentos, baixas manuais ou cobrancas bancarias opera
 
 ## Operacao
 
+- Primeiro abra **Empresas do Comercial > 1. Conferir e migrar planos**. A API
+  assinada `/central/planos?apos=N` exporta ofertas ativas ou contratadas, com
+  versao, preco, moeda, periodicidade e limite de usuarios. Nao exporta segredos.
+- A previa percorre todas as paginas, sem gravar dados. Selecione os planos
+  ausentes e confirme a conferencia para importa-los. Planos equivalentes ja
+  existentes nao sao duplicados. Nenhuma assinatura ou cobranca e criada aqui.
+- A importacao e transacional e auditada. Mudanca no catalogo apos a previa,
+  divergencia de preco/limite, varias versoes com condicoes distintas, moeda nao
+  BRL ou plano existente incompatível exigem revisao; nao sao sobrescritos.
+- Depois siga **2. Conferir e migrar assinaturas**. A previa de cada empresa
+  oferece somente os planos compativeis e exige selecao explicita. Se nenhum
+  corresponder, informa isso antes de confirmar e permite trazer os da origem.
 - Empresas do Comercial consulta `/central/empresas?apos=N` em paginas de 50.
 - HMAC cobre timestamp e caminho completo, incluindo query. Sem redirecionamento HTTP.
 - A consulta e somente leitura e funciona antes da ativacao. Nao expoe senhas,
