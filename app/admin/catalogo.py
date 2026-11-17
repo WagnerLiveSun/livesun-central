@@ -37,12 +37,17 @@ def listing(kind):
         abort(403)
     model, schema, title = CATALOG[kind]
     query = db.select(model)
+    if kind == 'clientes':
+        from app.services.cadastro_service import document_column, document_digits
+        document = document_digits(request.args.get('documento', ''))
+        if request.args.get('documento', '').strip():
+            query = query.where(document_column() == document) if document else query.where(db.false())
     product_id = request.args.get('produto',type=int)
     if kind in ('planos','modulos') and product_id:
         query = query.where(model.produto_id == product_id)
     page = db.paginate(query.order_by(model.id.desc()), per_page=30, max_per_page=30)
     rows = [snapshot(obj) for obj in page.items]
-    columns = {'clientes': ['id', 'codigo_externo', 'razao_social', 'email_principal', 'status'],
+    columns = {'clientes': ['id', 'codigo_externo', 'razao_social', 'cnpj_cpf', 'email_principal', 'status'],
                'produtos': ['id', 'codigo', 'nome', 'ativo'],
                'planos': ['id', 'produto_id', 'nome', 'valor_mensal', 'ativo'],
                'modulos': ['id', 'produto_id', 'codigo', 'nome'],

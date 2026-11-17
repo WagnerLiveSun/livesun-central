@@ -16,7 +16,7 @@ def comercial_catalog():
         catalog = preview()
     except BusinessError as failure:
         error = str(failure)
-    return render_template('comercial_catalog.html', title='Planos de origem · Comercial', catalog=catalog, error=error)
+    return render_template('comercial_catalog.html', title='Importar planos do Comercial', catalog=catalog, error=error)
 
 
 @admin.post('/empresas-comercial/planos/importar')
@@ -27,7 +27,7 @@ def import_comercial_catalog():
         count = import_selected(request.form.get('origem_hash', ''), request.form.getlist('planos'),
             request.form.get('confirmacao') == 'CONFERIDO')
         db.session.commit()
-        flash(f'{count} plano(s) criado(s). Planos existentes preservados; nenhuma assinatura ou cobrança criada.', 'success')
+        flash(f'{count} plano(s) importado(s).', 'success')
     except BusinessError as failure:
         db.session.rollback()
         flash(str(failure), 'warning')
@@ -61,7 +61,7 @@ def comercial_companies():
 def prepare_comercial_company(identifier):
     row = service.prepare_registration(identifier)
     db.session.commit()
-    flash('Prévia preparada. Confira plano, datas, cliente e bonificação antes de confirmar. Nenhuma cobrança iniciada.', 'success')
+    flash('Confira os dados antes de confirmar.', 'success')
     return redirect(url_for('admin.registration_detail', identifier=row.id))
 
 
@@ -76,5 +76,5 @@ def confirm_comercial_company(identifier):
         flash(str(error), 'warning')
         return redirect(url_for('admin.registration_detail', identifier=identifier))
     db.session.commit()
-    flash('Condições legadas preservadas no Central. Aguarde a confirmação do vínculo pelo Comercial; controle continua separado da ativação.', 'success')
+    flash('Assinatura migrada. Aguardando confirmação do vínculo.', 'success')
     return redirect(url_for('admin.registration_detail', identifier=row.id))

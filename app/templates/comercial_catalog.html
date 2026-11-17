@@ -1,30 +1,32 @@
 {% extends 'base.html' %}
-{% block actions %}<a class="button" href="{{ url_for('admin.comercial_companies') }}">2. Conferir e migrar assinaturas</a>{% endblock %}
+{% block actions %}<a class="button" href="{{ url_for('admin.comercial_companies') }}">Assinaturas do Comercial</a>{% endblock %}
 {% block content %}
 <section class="card">
-  <h2>1. Conferir catálogo existente no Comercial</h2>
-  <p>Consulta por API autenticada ao MySQL do Comercial, sem conexão direta ao banco. Importar cria somente os planos selecionados no Central. Não cria assinaturas, cobranças ou recorrências e não ativa o controle pelo Central.</p>
-  <p>Preços e limites existentes não serão sobrescritos. Versões com condições diferentes, moeda não suportada e dados inválidos exigem revisão explícita; nenhum preço é presumido.</p>
   {% if error %}<p class="notice error" role="alert">{{ error }}</p>{% elif catalog %}
-  <p>{{ catalog.total_ofertas }} oferta(s) encontrada(s). Atualize esta prévia se o catálogo de origem mudar.</p>
+  {% if not catalog.linhas %}
+  <p role="status">Não há planos cadastrados no catálogo do Comercial para importar.</p>
+  <p>As assinaturas existentes são consultadas separadamente em <a href="{{ url_for('admin.comercial_companies') }}">Empresas do Comercial</a>.</p>
+  {% else %}
+  <p>Selecione os planos para importar. Planos existentes não serão alterados.</p>
   <form method="post" action="{{ url_for('admin.import_comercial_catalog') }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="origem_hash" value="{{ catalog.hash }}">
     <div class="table-wrap"><table>
-      <thead><tr><th>Selecionar</th><th>Plano / ciclo</th><th>Ofertas de origem</th><th>Valor original</th><th>Limite de usuários</th><th>Situação</th></tr></thead>
+      <thead><tr><th>Selecionar</th><th>Plano / ciclo</th><th>Versões</th><th>Valor</th><th>Usuários</th><th>Situação</th></tr></thead>
       <tbody>{% for row in catalog.linhas %}
         <tr><td>{% if row.acao == 'CRIAR' and current_user.perfil in ['superadmin','comercial'] %}<input type="checkbox" name="planos" value="{{ row.codigo }}" aria-label="Importar {{ row.codigo }}">{% else %}—{% endif %}</td>
           <td>{{ row.oferta.nome }}<small>{{ row.codigo }} · {{ row.oferta.periodicidade }}</small></td>
           <td>{% for offer in row.ofertas %}<small>#{{ offer.id }} · versão {{ offer.versao }} · {{ 'Ativa' if offer.ativo else 'Inativa' }}{{ ' · Em uso' if offer.contratado else '' }} · {{ offer.moeda }} {{ offer.preco }} · {{ offer.usuarios if offer.usuarios is not none else 'Sem limite informado' }}</small>{% endfor %}</td>
           <td>{{ row.oferta.moeda }} {{ row.oferta.preco }}</td><td>{{ row.oferta.usuarios if row.oferta.usuarios is not none else 'Não informado' }}</td>
-          <td>{% if row.conflito %}<span role="alert">{{ row.conflito }}</span>{% elif row.plano_id %}Já existe no Central; preservado{% else %}Pronto para importar{% endif %}</td></tr>
-      {% else %}<tr><td colspan="6">Nenhuma oferta ativa ou contratada encontrada. A migração não inventa planos para assinaturas sem catálogo.</td></tr>{% endfor %}</tbody>
+          <td>{% if row.conflito %}<span role="alert">{{ row.conflito }}</span>{% elif row.plano_id %}Já cadastrado{% else %}Disponível{% endif %}</td></tr>
+      {% endfor %}</tbody>
     </table></div>
     {% if current_user.perfil in ['superadmin','comercial'] and catalog.linhas|selectattr('acao','equalto','CRIAR')|list %}
-    <label><input type="checkbox" name="confirmacao" value="CONFERIDO" required> Conferi preços, periodicidades, versões e limites dos planos selecionados.</label>
+    <label><input type="checkbox" name="confirmacao" value="CONFERIDO" required> Conferi os planos selecionados.</label>
     <button class="primary">Importar planos selecionados</button>
     {% endif %}
   </form>
+  {% endif %}
   {% endif %}
 </section>
 {% endblock %}

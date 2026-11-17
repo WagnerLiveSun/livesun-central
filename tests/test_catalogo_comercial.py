@@ -185,3 +185,17 @@ def test_post_import_creates_plan_then_redirects_to_preview(app,client,commercia
             'origem_hash':view['hash'],'planos':'PREMIUM','confirmacao':'CONFERIDO'})
     assert response.status_code==302 and response.location.endswith('/empresas-comercial/planos')
     assert db.session.query(Plano).filter_by(produto_id=commercial_product.id).count()==1
+
+
+def test_empty_catalog_has_direct_message_without_empty_table(app,client,commercial_product):
+    login(client)
+    with patch.object(catalog,'source_catalog',return_value=[]):
+        response=client.get('/empresas-comercial/planos')
+    text=response.get_data(as_text=True)
+    assert response.status_code==200
+    assert 'Não há planos cadastrados no catálogo do Comercial para importar.' in text
+    assert 'Empresas do Comercial</a>' in text
+    assert '<table>' not in text
+    assert 'A migração não inventa' not in text
+    assert '0 oferta(s)' not in text
+    assert 'name="planos"' not in text

@@ -55,7 +55,9 @@ def received_registrations():
 @operator_required('superadmin','comercial','suporte','auditor')
 def registration_detail(identifier):
     row=db.get_or_404(SolicitacaoCadastro,identifier)
-    customers=db.session.scalars(db.select(Cliente).filter_by(status='ATIVO').order_by(Cliente.razao_social)).all()
+    from app.services.cadastro_service import matching_customers
+    customer_matches = matching_customers(row.cnpj_cpf)
+    customers = [customer for customer in customer_matches if customer.status == 'ATIVO']
     plans=db.session.scalars(db.select(Plano).filter_by(produto_id=row.produto_id,ativo=True)).all()
     from app.services.empresas_comercial_service import is_legacy, company, fingerprint, conditions, plan_mismatch
     legacy_preview, legacy_hash, legacy_error = None, None, None
@@ -74,7 +76,8 @@ def registration_detail(identifier):
         except BusinessError as error:
             legacy_error = str(error)
     return render_template('registration.html',title='Cadastro · '+row.razao_social,row=row,customers=customers,plans=plans,
-        legacy=legacy, legacy_preview=legacy_preview, legacy_hash=legacy_hash, legacy_error=legacy_error)
+        legacy=legacy, legacy_preview=legacy_preview, legacy_hash=legacy_hash, legacy_error=legacy_error,
+        customer_matches=customer_matches)
 
 
 @admin.post('/cadastros-recebidos/<int:identifier>/habilitar')

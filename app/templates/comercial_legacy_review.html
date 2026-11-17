@@ -12,7 +12,7 @@
   {% if not legacy_error and legacy_hash and current_user.perfil in ['superadmin','comercial'] %}
   <form method="post" action="{{ url_for('admin.confirm_comercial_company',identifier=row.id) }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="origem_hash" value="{{ legacy_hash }}">
-    <label>Cliente<select name="cliente_id"><option value="">Criar cliente com os dados recebidos</option>{% for customer in customers %}<option value="{{ customer.id }}">{{ customer.razao_social }} · {{ customer.cnpj_cpf or 'Sem documento' }}</option>{% endfor %}</select></label>
+    <label>Cliente<select name="cliente_id" {% if customer_matches %}required{% endif %}>{% if customer_matches %}<option value="">Selecione o cliente existente...</option>{% else %}<option value="">Criar cliente com os dados recebidos</option>{% endif %}{% for customer in customers %}<option value="{{ customer.id }}">#{{ customer.id }} · {{ customer.razao_social }} · {{ customer.cnpj_cpf }}</option>{% endfor %}</select></label>
     <label>Plano COMERCIAL compatível com a origem<select name="plano_id" required><option value="">Selecione o plano conferido...</option>{% for plan in plans %}<option value="{{ plan.id }}">{{ plan.nome }} · {{ plan.codigo }} · R$ {{ plan.valor_mensal }} / {{ plan.periodicidade }}</option>{% endfor %}</select></label>
     <label>Justificativa<input name="motivo" minlength="3" maxlength="500" required></label>
     <label><input type="checkbox" name="confirmacao" value="CONFERIDO" required> Conferi cliente, plano, preço, datas e bonificação; preservar as condições exibidas.</label>

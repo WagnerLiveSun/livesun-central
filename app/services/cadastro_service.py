@@ -32,21 +32,42 @@ def receive(product, payload):
     return row, True
 
 
+def document_digits(value):
+    return ''.join(c for c in (value or '') if c.isdigit())
+
+
+def document_column():
+    column = Cliente.cnpj_cpf
+    for separator in ('.', '/', '-', ' ', '\t', '\n', '\r'):
+        column = db.func.replace(column, separator, '')
+    return column
+
+
+def matching_customers(document):
+    digits = document_digits(document)
+    if not digits:
+        return []
+    return list(db.session.scalars(db.select(Cliente).where(document_column() == digits)
+                                  .order_by(Cliente.razao_social, Cliente.id)))
+
+
 def resolve_customer(row, client_id):
     """Mesma proteção contra documento divergente e duplicação em ambos os fluxos."""
     if client_id:
         customer = db.session.get(Cliente, client_id)
-        if not customer or customer.status != 'ATIVO':
-            raise BusinessError('Cliente indisponível.')
+        if not customer:
+            raise BusinessError('Cliente não encontrado.')
+        if customer.status != 'ATIVO':
+            raise BusinessError(f'Cliente #{customer.id} está {customer.status.lower()}. Revise o cadastro em Clientes.')
         # O operador pode escolher cliente de outro produto, mas não outro documento.
-        document = ''.join(c for c in (customer.cnpj_cpf or '') if c.isdigit())
-        if document != row.cnpj_cpf:
+        document = document_digits(customer.cnpj_cpf)
+        if document != document_digits(row.cnpj_cpf):
             raise BusinessError('CPF/CNPJ do cliente selecionado não corresponde ao cadastro recebido.')
     else:
-        normalized = db.func.replace(db.func.replace(db.func.replace(db.func.replace(
-            Cliente.cnpj_cpf,'.',''),'/',''),'-',''),' ','')
-        matches = list(db.session.scalars(db.select(Cliente).where(normalized == row.cnpj_cpf)))
+        matches = matching_customers(row.cnpj_cpf)
         if matches:
+            if not any(item.status == 'ATIVO' for item in matches):
+                raise BusinessError('Já existe cliente inativo ou excluído com esse documento. Revise o cadastro em Clientes.')
             raise BusinessError('Já existe cliente com esse documento. Selecione-o para evitar duplicação.')
         code = 'CAD_' + str(row.produto_id) + '_' + row.empresa_origem
         data = ClienteInput.model_validate({'codigo_externo':code, 'razao_social':row.razao_social,

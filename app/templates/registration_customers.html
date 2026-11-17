@@ -1,0 +1,10 @@
+{% if customer_matches %}
+<section class="card">
+  <h2>Clientes com este CPF/CNPJ</h2>
+  {% for customer in customer_matches %}
+  <p>#{{ customer.id }} · {{ customer.razao_social }} · {{ customer.cnpj_cpf }} · <strong>{{ customer.status }}</strong>
+    {% if current_user.perfil in ['superadmin','comercial'] %}<a href="{{ url_for('admin.edit',kind='clientes',identifier=customer.id) }}">Abrir cliente</a>{% endif %}</p>
+  {% endfor %}
+  {% if customers %}<p>Selecione um cliente ativo abaixo.</p>{% else %}<p>Revise a situação do cliente antes de vincular.</p>{% endif %}
+</section>
+{% endif %}
