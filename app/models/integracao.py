@@ -21,13 +21,20 @@ class ConfigAsaas(Base):
 
 class EventoAsaas(Base):
     __tablename__ = 'eventos_asaas_central'
+    __table_args__ = (
+        db.UniqueConstraint('ambiente', 'event_id',
+                            name='uq_eventos_asaas_central_ambiente_event_id'),
+    )
     evento_externo = db.Column(db.String(150), nullable=False, unique=True)
     ambiente = db.Column(db.String(20), nullable=False)
+    event_id = db.Column(db.String(150), nullable=False, index=True)
     payment_id = db.Column(db.String(100))
     subscription_id = db.Column(db.String(100))
+    cobranca_id = db.Column(db.Integer, db.ForeignKey('cobrancas.id'), index=True)
     tipo = db.Column(db.String(100), nullable=False)
-    status = db.Column(db.String(20), nullable=False, default='PENDENTE')
+    status = db.Column(db.String(20), nullable=False, default='PENDENTE', index=True)
     erro = db.Column(db.String(100))
+    data_recebimento = db.Column(db.DateTime)
 
 
 class OperacaoAsaas(Base):

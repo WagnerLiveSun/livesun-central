@@ -22,9 +22,13 @@ def configure(app, overrides=None):
         RATELIMIT_ENABLED=True,
         TRUST_PROXY=os.getenv('TRUST_PROXY') == 'true',
         ACCESS_EMAIL_ENABLED=os.getenv('ACCESS_EMAIL_ENABLED', 'false').lower() == 'true',
+        EMAIL_TEST_RECIPIENTS=[x.strip().lower() for x in os.getenv('EMAIL_TEST_RECIPIENTS', '').split(',') if x.strip()],
         BREVO_API_KEY=os.getenv('BREVO_API_KEY', ''),
         BREVO_SENDER_EMAIL=os.getenv('BREVO_SENDER_EMAIL', ''),
         BREVO_SENDER_NAME=os.getenv('BREVO_SENDER_NAME', 'LiveSun'),
+        ASAAS_API_URL=os.getenv('ASAAS_API_URL', '').strip(),
+        ASAAS_API_KEY=os.getenv('ASAAS_API_KEY', '').strip(),
+        ASAAS_WEBHOOK_TOKEN=os.getenv('ASAAS_WEBHOOK_TOKEN', '').strip(),
     )
     app.config.update(overrides or {})
     production = app.config['APP_ENV'] == 'production'

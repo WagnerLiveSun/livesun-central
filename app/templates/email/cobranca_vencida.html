@@ -1,0 +1,4 @@
+<p>Olá, {{ nome }}.</p>
+<p>A cobrança do LiveSun Propostas está vencida.</p>
+<p>Vencimento: {{ vencimento }} · valor: R$ {{ valor }}.</p>
+{% if invoice_url %}<p><a href="{{ invoice_url }}">Abrir fatura no Asaas</a></p>{% endif %}

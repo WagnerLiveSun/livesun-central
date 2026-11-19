@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="card">
+  <h2>Contratar LiveSun Propostas</h2>
+  <form id="contratacao" method="post" class="form-grid">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label>Nome ou razão social<input name="razao_social" value="{{ customer.razao_social }}" required maxlength="200" {% if customer_checkout %}readonly{% endif %}></label>
+    <label>CPF ou CNPJ<input name="cnpj_cpf" value="{{ customer.cnpj_cpf or '' }}" maxlength="18" {% if customer_checkout %}readonly{% endif %}></label>
+    <label>E-mail<input name="email_principal" type="email" value="{{ customer.email_principal }}" required maxlength="254" {% if customer_checkout %}readonly{% endif %}></label>
+    <label>Telefone<input name="telefone" value="{{ customer.telefone or '' }}" maxlength="30" {% if customer_checkout %}readonly{% endif %}></label>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Escolha o plano</h2>
+  {% if existing %}
+  <p class="badge">Status de acesso: {{ existing.status }}</p>
+  <p>Situação financeira: {{ charges[0].status if charges else 'Aguardando geração da fatura pelo worker' }}</p>
+  <p>{{ existing.plano.nome }} · R$ {{ existing.plano.valor_mensal }} / {{ existing.plano.periodicidade }}</p>
+  {% if existing.liberado_em %}<p>Liberação manual: {{ existing.liberado_por.nome if existing.liberado_por else 'Operador' }} #{{ existing.liberado_por_id }}, {{ existing.liberado_em.strftime('%d/%m/%Y %H:%M') }} UTC.</p>{% endif %}
+  {% for charge in charges %}
+    {% if charge.invoice_url %}
+    <p><a class="button primary" href="{{ charge.invoice_url }}" target="_blank" rel="noopener noreferrer">Abrir fatura Asaas</a></p>
+    {% endif %}
+  {% endfor %}
+  <p>O acesso será liberado somente após validação manual pelo operador.</p>
+  {% else %}
+  <div class="form-grid">
+    <label>Plano
+      <select name="periodicidade" form="contratacao" required>
+        <option value="mensal">Mensal — R$ 80,00 por mês</option>
+        <option value="anual">Anual — R$ 600,00 por ano, cobrança única</option>
+      </select>
+    </label>
+    <p>O plano anual é cobrado integralmente uma vez por ano. Não é parcelamento.</p>
+    <button class="primary" form="contratacao">Contratar agora</button>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

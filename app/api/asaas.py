@@ -1,7 +1,7 @@
 from flask import request, abort
 from sqlalchemy.exc import IntegrityError
 from app.extensions import db
-from app.services.asaas_service import receive
+from app.services.asaas_service import receive, receive_public
 from . import api
 
 
@@ -14,6 +14,19 @@ def asaas_webhook(environment):
         abort(422)
     try:
         created = receive(environment, request.headers.get('asaas-access-token', ''), payload)
+    except IntegrityError:
+        db.session.rollback()
+        created = False
+    return {'status': 'recebido' if created else 'duplicado'}, 200
+
+
+@api.post('/asaas/webhook')
+def asaas_public_webhook():
+    payload = request.get_json()
+    if not isinstance(payload, dict):
+        abort(422)
+    try:
+        created = receive_public(request.headers.get('asaas-access-token', ''), payload)
     except IntegrityError:
         db.session.rollback()
         created = False

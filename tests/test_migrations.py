@@ -67,3 +67,32 @@ def test_upgrade_existing_subscription_preserves_data(tmp_path):
         obj=db.session.get(Assinatura,1)
         assert obj.status=='ATIVA' and obj.carencia_dias==7
         assert not obj.asaas_habilitado and not obj.cortesia
+
+
+def test_entrega4_models_preserve_existing_subscription(tmp_path):
+    path = tmp_path/'entrega4.db'
+    app = create_app({'TESTING': True, 'APP_ENV': 'development', 'DB_ENGINE': 'sqlite',
+        'DATABASE_URL': 'sqlite:///'+str(path),
+        'SECRET_KEY': 's'*40, 'JWT_SECRET': 'j'*40,
+        'ENCRYPTION_KEY': Fernet.generate_key().decode()})
+    with app.app_context():
+        from flask_migrate import upgrade
+        upgrade()
+        from sqlalchemy import inspect, text
+        from app.models import Assinatura, Cliente, Cobranca, EventoAsaas
+
+        assert 'asaas_sandbox_customer_id' in {
+            column['name'] for column in inspect(db.engine).get_columns('clientes')}
+        assert 'asaas_producao_customer_id' in {
+            column['name'] for column in inspect(db.engine).get_columns('clientes')}
+        assert 'PAGO_AGUARDANDO_LIBERACAO' in str(
+            next(c for c in Assinatura.__table__.constraints
+                 if getattr(c, 'name', None) == 'ck_assinaturas_status_valido').sqltext)
+        assert 'liberado_por_id' in {
+            column['name'] for column in inspect(db.engine).get_columns('assinaturas')}
+        assert 'billing_type' in {
+            column['name'] for column in inspect(db.engine).get_columns('cobrancas')}
+        assert 'event_id' in {
+            column['name'] for column in inspect(db.engine).get_columns('eventos_asaas_central')}
+        assert 'data_recebimento' in {
+            column['name'] for column in inspect(db.engine).get_columns('eventos_asaas_central')}

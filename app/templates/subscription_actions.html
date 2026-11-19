@@ -1,8 +1,21 @@
 {% set role = current_user.perfil %}
+{% if obj.asaas_habilitado and obj.status in ['PAGO_AGUARDANDO_LIBERACAO','TRIAL','SUSPENSA'] and role in ['superadmin','comercial','financeiro'] %}
+<button type="button" class="action-success" data-dialog="liberar-{{ obj.id }}">Liberar acesso</button>
+<dialog id="liberar-{{ obj.id }}" class="action-dialog">
+  <form method="post" action="{{ url_for('admin.subscription_action',identifier=obj.id,action='liberar') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="retorno" value="{{ 'painel' if panel_view else 'detalhe' }}">
+    <h2>Confirmar liberação manual</h2>
+    <p>{{ obj.cliente.razao_social }} · {{ obj.produto.nome }}</p>
+    <p>Somente confirme após validar o pagamento elegível. A liberação não é automática.</p>
+    <div class="actions"><button type="button" data-close-dialog>Cancelar</button><button class="primary">Liberar acesso</button></div>
+  </form>
+</dialog>
+{% endif %}
 {% if obj.status != 'EXCLUIDA' and role in ['superadmin','comercial','financeiro','suporte'] %}
 <div class="quick-actions" aria-label="Ações de {{ obj.cliente.razao_social }}">
 {% for status,label,tone in [('ATIVA','Ativar' if obj.status == 'TRIAL' else 'Reativar','success'),('SUSPENSA','Suspender','warning'),('BLOQUEADA','Bloquear','danger'),('CANCELADA','Cancelar','muted'),('EXCLUIDA','Excluir','danger')] %}
-{% if status != obj.status and (role in ['superadmin','comercial'] or (role == 'financeiro' and status == 'SUSPENSA') or (role == 'suporte' and status in ['SUSPENSA','BLOQUEADA'])) and (obj.status not in ['CANCELADA','EXPIRADA'] or status in ['ATIVA','EXCLUIDA']) %}
+{% if status != obj.status and not (status == 'ATIVA' and obj.asaas_habilitado and obj.produto.codigo == 'PROPOSTAS') and (role in ['superadmin','comercial'] or (role == 'financeiro' and status == 'SUSPENSA') or (role == 'suporte' and status in ['SUSPENSA','BLOQUEADA'])) and (obj.status not in ['CANCELADA','EXPIRADA'] or status in ['ATIVA','EXCLUIDA']) %}
 <button type="button" class="action-{{ tone }}" data-dialog="status-{{ obj.id }}-{{ status }}" data-status="{{ status }}">{{ label }}</button>
 <dialog id="status-{{ obj.id }}-{{ status }}" class="action-dialog">
   <form method="post" action="{{ url_for('admin.subscription_action',identifier=obj.id,action='status') }}">

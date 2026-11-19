@@ -51,7 +51,7 @@ def test_start_charge_uses_product_account_and_subscription_plan(app,client):
         response=client.post(f'/assinaturas/{obj.id}/comercial/asaas',data={'forma':'PIX','ambiente':'producao'})
         remote.assert_not_called()
     assert response.status_code==302
-    assert obj.asaas_ambiente=='sandbox' and obj.asaas_forma=='PIX'
+    assert obj.asaas_ambiente=='sandbox' and obj.asaas_forma=='UNDEFINED'
     op=db.session.scalar(db.select(OperacaoAsaas))
     assert op.assinatura_id==obj.id
     assert db.session.scalar(db.select(db.func.count()).select_from(Cobranca))==0

@@ -4,7 +4,11 @@ from .base import Base
 
 class Cobranca(Base):
     __tablename__ = 'cobrancas'
-    __table_args__ = (db.UniqueConstraint('assinatura_id', 'competencia'),)
+    __table_args__ = (
+        db.UniqueConstraint('assinatura_id', 'competencia'),
+        db.UniqueConstraint('asaas_ambiente', 'gateway_payment_id',
+                            name='uq_cobrancas_asaas_ambiente_gateway_payment_id'),
+    )
     assinatura_id = db.Column(db.Integer, db.ForeignKey('assinaturas.id'), nullable=False)
     competencia = db.Column(db.String(7), nullable=False)
     valor = db.Column(db.Numeric(12, 2), nullable=False)
@@ -14,5 +18,9 @@ class Cobranca(Base):
     gateway = db.Column(db.String(50))
     referencia_externa = db.Column(db.String(150))
     observacoes = db.Column(db.Text)
-    gateway_payment_id = db.Column(db.String(100), unique=True)
+    gateway_payment_id = db.Column(db.String(100), index=True)
     invoice_url = db.Column(db.String(1000))
+    asaas_ambiente = db.Column(db.String(20), index=True)
+    billing_type = db.Column(db.String(20))
+    ultimo_evento = db.Column(db.String(100))
+    ultimo_evento_em = db.Column(db.DateTime)

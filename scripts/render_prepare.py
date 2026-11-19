@@ -58,6 +58,22 @@ def main():
                     raise PreparationError()
             stage('schema_validation', validate_schema,
                   'Confira conexão, permissões e banco exclusivo do Central com controle Alembic. Não apague tabelas.')
+            if app.config['APP_ENV'] == 'production':
+                # Inicialização nunca autoriza DDL, seeds ou bootstrap em produção.
+                from alembic.migration import MigrationContext
+                from alembic.script import ScriptDirectory
+                from alembic.config import Config
+                def verify_revision():
+                    config = Config()
+                    config.set_main_option('script_location', str(Path(__file__).resolve().parents[1] / 'migrations'))
+                    with db.engine.connect() as connection:
+                        applied = set(MigrationContext.configure(connection).get_current_heads())
+                    if applied != set(ScriptDirectory.from_config(config).get_heads()):
+                        raise PreparationError()
+                stage('production_revision_read_only', verify_revision,
+                      'Revisão pendente. Aplicação manual depende de aprovação; startup não executa migrations.')
+                print('Revisão de produção conferida; nenhuma migration, seed ou bootstrap executado.', flush=True)
+                return 0
             stage('migrations', upgrade, 'Confira revisões Alembic e permissões DDL. Não recrie o banco.')
             stage('seed_propostas', seed, 'Confira catálogo, constraints e PROPOSTAS_WEBHOOK_SECRET (mínimo 32 caracteres).')
             stage('seed_comercial', seed_comercial, 'Confira catálogo e constraints do produto Comercial.')

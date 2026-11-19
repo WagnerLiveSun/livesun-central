@@ -39,6 +39,22 @@ def create_app(overrides=None):
     limiter.limit('120 per minute')(api)
     app.register_blueprint(api)
     app.register_blueprint(admin)
+    def public_webhook_adapter():
+        from flask import jsonify, request
+        payload = request.get_json()
+        if not isinstance(payload, dict):
+            return jsonify(error='Payload inválido.'), 422
+        try:
+            from app.services.asaas_service import receive_public
+            created = receive_public(request.headers.get('asaas-access-token', ''), payload)
+        except IntegrityError:
+            db.session.rollback()
+            created = False
+        return jsonify(status='recebido' if created else 'duplicado'), 200
+
+    csrf.exempt(public_webhook_adapter)
+    app.add_url_rule('/api/asaas/webhook', endpoint='asaas_public_webhook',
+                     view_func=public_webhook_adapter, methods=['POST'])
     login.login_view = 'admin.login_view'
 
     @login.user_loader

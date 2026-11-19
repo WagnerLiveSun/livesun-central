@@ -4,12 +4,43 @@ from flask_login import current_user
 from app.extensions import db
 from app.models import Assinatura, Cliente, Produto, Plano, Modulo, EventoAssinatura, Cobranca, WebhookEntrega, PurgaProduto, OperacaoAsaas
 from app.security import operator_required
-from app.schemas import AssinaturaInput, StatusInput, PlanChange, ModuleChange, LimitsInput
+from app.schemas import AssinaturaInput, StatusInput, PlanChange, ModuleChange, LimitsInput, ClienteInput
 from app.services import assinatura_service as service
 from app.services.entitlement_service import effective
 from app.services.auditoria_service import snapshot
 from .catalogo import form_values
 from . import admin
+
+
+@admin.route('/contratar/propostas', methods=['GET', 'POST'])
+def customer_checkout():
+    import time
+    from flask import session
+    from app.services.checkout_service import resolve
+    token = request.args.get('token')
+    if token:
+        customer_id = resolve(token)
+        session['checkout_propostas'] = {'cliente_id': customer_id, 'ate': int(time.time()) + 900}
+        return redirect(url_for('admin.customer_checkout'))
+    grant = session.get('checkout_propostas', {})
+    if grant.get('ate', 0) < time.time():
+        abort(401)
+    customer = db.get_or_404(Cliente, grant.get('cliente_id'))
+    product = db.session.scalar(db.select(Produto).filter_by(codigo='PROPOSTAS', ativo=True))
+    if not product:
+        abort(404)
+    existing = db.session.scalar(db.select(Assinatura).where(
+        Assinatura.cliente_id == customer.id, Assinatura.produto_id == product.id,
+        Assinatura.slot_vigente == 1, Assinatura.asaas_habilitado.is_(True)))
+    if request.method == 'POST':
+        from app.services.asaas_service import start_propostas_contratacao
+        start_propostas_contratacao(customer.id, request.form.get('periodicidade'))
+        db.session.commit()
+        return redirect(url_for('admin.customer_checkout'))
+    charges = db.session.scalars(db.select(Cobranca).where(
+        Cobranca.assinatura_id == existing.id).order_by(Cobranca.id.desc()).limit(10)).all() if existing else []
+    return render_template('contratar_propostas.html', title='Contratar LiveSun Propostas',
+                           customer=customer, existing=existing, charges=charges, customer_checkout=True)
 
 
 @admin.get('/assinaturas')
@@ -23,7 +54,7 @@ def subscriptions():
         query = query.where(Cliente.razao_social.ilike('%'+search+'%'))
     if product:
         query = query.where(Assinatura.produto_id == product)
-    if status in ('ATIVA','TRIAL','SUSPENSA','BLOQUEADA','CANCELADA','EXCLUIDA','EXPIRADA'):
+    if status in ('ATIVA','TRIAL','PAGO_AGUARDANDO_LIBERACAO','SUSPENSA','BLOQUEADA','CANCELADA','EXCLUIDA','EXPIRADA'):
         query = query.where(Assinatura.status == status)
     page = db.paginate(query.order_by(Assinatura.id.desc()), per_page=30)
     counts = dict(db.session.execute(db.select(Assinatura.status,db.func.count(Assinatura.id)).group_by(Assinatura.status)).all())
@@ -42,6 +73,52 @@ def new_subscription():
                            clientes=db.session.scalars(db.select(Cliente).filter_by(status='ATIVO')).all(),
                            produtos=db.session.scalars(db.select(Produto).filter_by(ativo=True)).all(),
                            planos=db.session.scalars(db.select(Plano).filter_by(ativo=True)).all())
+
+
+@admin.route('/contratar-propostas/<int:cliente_id>', methods=['GET', 'POST'])
+@operator_required('superadmin', 'comercial')
+def contratar_propostas(cliente_id):
+    customer = db.get_or_404(Cliente, cliente_id)
+    if customer.status != 'ATIVO':
+        abort(404)
+    product = db.session.scalar(db.select(Produto).filter_by(codigo='PROPOSTAS', ativo=True))
+    if not product:
+        abort(404)
+    existing = db.session.scalar(db.select(Assinatura).where(
+        Assinatura.cliente_id == customer.id,
+        Assinatura.produto_id == product.id,
+        Assinatura.slot_vigente == 1,
+        Assinatura.asaas_habilitado.is_(True)).order_by(Assinatura.id.desc()))
+    if request.method == 'POST':
+        from app.services.asaas_service import start_propostas_contratacao
+        periodicidade = request.form.get('periodicidade', '')
+        customer_data = {
+            'razao_social': request.form.get('razao_social', '').strip(),
+            'cnpj_cpf': request.form.get('cnpj_cpf', '').strip() or None,
+            'email_principal': request.form.get('email_principal', '').strip(),
+            'telefone': request.form.get('telefone', '').strip() or None,
+        }
+        validated = ClienteInput.model_validate({'codigo_externo': customer.codigo_externo, **customer_data})
+        customer_data = {key: getattr(validated, key) for key in customer_data}
+        try:
+            subscription, created = start_propostas_contratacao(
+                customer.id, periodicidade, customer_data)
+        except Exception as error:
+            from app.services.assinatura_service import BusinessError
+            if isinstance(error, BusinessError):
+                flash(str(error), 'error')
+                db.session.rollback()
+                return redirect(url_for('admin.contratar_propostas', cliente_id=cliente_id))
+            raise
+        db.session.commit()
+        flash('Cobrança existente apresentada.' if not created else 'Assinatura e cobrança criadas.', 'success')
+        return redirect(url_for('admin.subscription', identifier=subscription.id))
+    charges = db.session.scalars(db.select(Cobranca).join(Assinatura).where(
+        Assinatura.cliente_id == customer.id,
+        Assinatura.produto_id == product.id).order_by(Cobranca.id.desc()).limit(10)).all()
+    return render_template('contratar_propostas.html',
+                           title='Contratar LiveSun Propostas',
+                           customer=customer, existing=existing, charges=charges)
 
 
 @admin.get('/assinaturas/<int:identifier>')
@@ -66,7 +143,15 @@ def subscription(identifier):
 def subscription_action(identifier, action):
     obj = service.locked(identifier)
     role = current_user.perfil
-    if action == 'status':
+    if action == 'liberar':
+        if role not in ('superadmin', 'comercial', 'financeiro'):
+            abort(403)
+        from app.services.asaas_service import release_access
+        if not release_access(obj):
+            flash('A assinatura já está ativa.', 'success')
+        else:
+            flash('Acesso liberado manualmente.', 'success')
+    elif action == 'status':
         data = StatusInput.model_validate(form_values(StatusInput))
         if role == 'financeiro' and data.status != 'SUSPENSA':
             abort(403)

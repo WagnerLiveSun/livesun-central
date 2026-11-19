@@ -7,3 +7,6 @@ __pycache__/
 *.pyc
 instance/
 *.db
+backups/
+.pytest-entrega4.log
+.auditoria-entrega4.json

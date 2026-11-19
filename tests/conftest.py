@@ -11,10 +11,14 @@ from app.security import service_token, encrypt
 @pytest.fixture
 def app():
     url = os.getenv('TEST_DATABASE_URL', 'sqlite:///:memory:')
+    if url != 'sqlite:///:memory:':
+        raise RuntimeError('Esta suíte só permite SQLite em memória; nenhum banco externo será alterado.')
     engine = 'mysql' if url.startswith('mysql') else 'postgresql' if url.startswith('postgresql') else 'sqlite'
     application = create_app({'TESTING': True, 'DB_ENGINE': engine, 'DATABASE_URL': url,
         'SECRET_KEY': 's' * 40, 'JWT_SECRET': 'j' * 40, 'ENCRYPTION_KEY': Fernet.generate_key().decode(),
         'WTF_CSRF_ENABLED': False, 'RATELIMIT_ENABLED': False,
+        'ACCESS_EMAIL_ENABLED': False, 'BREVO_API_KEY': '', 'BREVO_SENDER_EMAIL': '',
+        'ASAAS_API_KEY': '', 'ASAAS_API_URL': '', 'ASAAS_WEBHOOK_TOKEN': '',
         'WEBHOOK_ALLOWED_HOSTS': ['propostas.livesun.com.br'], 'WEBHOOK_ALLOW_LOCAL_HTTP': False})
     with application.app_context():
         # TEST_DATABASE_URL precisa apontar exclusivamente para banco descartável.
@@ -36,3 +40,10 @@ def app():
 @pytest.fixture
 def client(app):
     return app.test_client()
+
+
+@pytest.fixture(autouse=True)
+def block_external_http(monkeypatch):
+    def blocked(*args, **kwargs):
+        raise RuntimeError('HTTP externo bloqueado durante testes; utilize mock.')
+    monkeypatch.setattr('requests.sessions.Session.request', blocked)

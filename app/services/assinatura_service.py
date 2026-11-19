@@ -20,13 +20,15 @@ def locked(identifier):
     return obj
 
 
-def record(subscription, kind, before):
+def record(subscription, kind, before, notification=None):
     subscription.versao += 1
     db.session.flush()
     who, ip = actor()
     event_id = 'evt_' + uuid4().hex
     after = snapshot(subscription)
     after['entitlements'] = effective(subscription)
+    if notification:
+        after['notificacao_cobranca'] = notification
     event = EventoAssinatura(assinatura_id=subscription.id, evento_id=event_id, tipo_evento=kind,
                              dados_anteriores=before, dados_novos=after,
                              usuario_responsavel=who, ip_origem=ip)
@@ -111,6 +113,10 @@ def create(data):
 
 
 def change_status(obj, status, reason):
+    if status == 'ATIVA' and obj.asaas_habilitado and obj.produto.codigo == 'PROPOSTAS' and obj.status != 'ATIVA':
+        raise BusinessError('Utilize a liberação manual auditada após conferir o pagamento.')
+    if status == 'PAGO_AGUARDANDO_LIBERACAO':
+        raise BusinessError('Este status é atualizado pelo pagamento Asaas e não por alteração manual.')
     if status not in STATUSES or status == obj.status or obj.status == 'EXCLUIDA':
         raise BusinessError('Transição de status inválida.')
     if not reason or not reason.strip():
