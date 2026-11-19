@@ -149,6 +149,8 @@ def register_commands(app):
                 sent = process_purge() or sent
                 from app.services.cadastro_service import deliver_one
                 sent = deliver_one() or sent
+                from app.services.notificacao_acesso_service import process_one as process_access_email
+                sent = process_access_email() or sent
             except Exception:
                 db.session.rollback()
                 current_app.logger.error('worker', extra={'safe_event': 'worker_iteration_failed'})

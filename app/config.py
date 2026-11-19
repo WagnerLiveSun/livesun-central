@@ -21,6 +21,10 @@ def configure(app, overrides=None):
         RATELIMIT_STORAGE_URI=os.getenv('RATELIMIT_STORAGE_URI', '').strip() or 'memory://',
         RATELIMIT_ENABLED=True,
         TRUST_PROXY=os.getenv('TRUST_PROXY') == 'true',
+        ACCESS_EMAIL_ENABLED=os.getenv('ACCESS_EMAIL_ENABLED', 'false').lower() == 'true',
+        BREVO_API_KEY=os.getenv('BREVO_API_KEY', ''),
+        BREVO_SENDER_EMAIL=os.getenv('BREVO_SENDER_EMAIL', ''),
+        BREVO_SENDER_NAME=os.getenv('BREVO_SENDER_NAME', 'LiveSun'),
     )
     app.config.update(overrides or {})
     production = app.config['APP_ENV'] == 'production'

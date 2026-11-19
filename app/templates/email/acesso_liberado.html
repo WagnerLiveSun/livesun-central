@@ -1,0 +1,11 @@
+<!doctype html><html lang="pt-BR"><body>
+<h1>Seu acesso ao LiveSun Propostas foi liberado</h1>
+<p>Olá, {{ nome }}.</p><p>Seu acesso ao LiveSun Propostas foi liberado.</p>
+<p>Produto: <strong>LiveSun Propostas</strong><br>Plano: <strong>PROPOSTAS</strong><br>
+Status: <strong>{{ status }}</strong><br>Início: {{ inicio.strftime('%d/%m/%Y') }}
+{% if trial_ate %}<br>Expiração do teste: {{ trial_ate.strftime('%d/%m/%Y') }}{% endif %}</p>
+<p><a href="{{ access_url }}">Acessar LiveSun Propostas</a></p>
+<p>Entre com seu e-mail e a senha que você cadastrou.</p>
+<h2>Primeiros passos</h2><ol><li>Confirme os dados da sua empresa.</li><li>Cadastre seus produtos ou serviços.</li><li>Cadastre um cliente.</li><li>Crie e envie sua primeira proposta.</li></ol>
+<p>Atenciosamente,<br>Equipe LiveSun</p><p>Suporte: <a href="mailto:suporte@livesun.com.br">suporte@livesun.com.br</a></p>
+</body></html>

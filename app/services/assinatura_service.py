@@ -33,6 +33,8 @@ def record(subscription, kind, before):
     db.session.add(event)
     db.session.flush()
     product = subscription.produto
+    from .notificacao_acesso_service import register_event
+    register_event(event, subscription)
     if product.url_webhook:
         payload = {'evento': kind, 'evento_id': event_id, 'ocorrido_em': iso(now()),
                    'cliente_id': str(subscription.cliente_id), 'produto': product.codigo,
