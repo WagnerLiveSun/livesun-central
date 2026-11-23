@@ -11,3 +11,5 @@ from .usuario import UsuarioCentral
 from .integracao import CredencialServico, ConfigAsaas, EventoAsaas, OperacaoAsaas, PurgaProduto
 from .solicitacao import SolicitacaoCadastro
 from .notificacao_acesso import NotificacaoAcesso, TentativaNotificacaoAcesso
+from .gateway_alternativo import GatewayAlternativo
+from .instituicao_bancaria import InstituicaoBancaria
