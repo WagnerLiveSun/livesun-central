@@ -434,7 +434,9 @@ def start_propostas_contratacao(cliente_id, periodicidade, customer_data=None):
 
 def process_one():
     event = db.session.scalar(db.select(EventoAsaas).where(
-        EventoAsaas.status.in_(['PENDENTE', 'FALHA'])
+        db.or_(EventoAsaas.status == 'PENDENTE',
+               db.and_(EventoAsaas.status == 'FALHA',
+                       EventoAsaas.atualizado_em <= now() - timedelta(minutes=1)))
     ).order_by(EventoAsaas.id).with_for_update(skip_locked=True))
     if event:
         try:
@@ -462,13 +464,15 @@ def process_one():
                         obj.status = 'SUSPENSA'
                         obj.motivo_status = 'Recorrência desativada no Asaas.'
                         record(obj, 'ASSINATURA_SUSPENSA', before)
-                event.status = 'PROCESSADO'
+                event.status, event.erro = 'PROCESSADO', None
             db.session.commit()
         except Exception:
             db.session.rollback()
             event = db.session.get(EventoAsaas, event.id)
             event.status, event.erro = 'FALHA', 'FALHA_CONSULTA_OU_CONCILIACAO'
+            event.atualizado_em = now()
             db.session.commit()
+            current_app.logger.warning('asaas', extra={'safe_event': 'asaas_evento_falhou'})
         return True
     operation = db.session.scalar(db.select(OperacaoAsaas).where(OperacaoAsaas.status == 'PENDENTE',
         OperacaoAsaas.proxima_tentativa <= now()).order_by(OperacaoAsaas.id).with_for_update(skip_locked=True))
@@ -495,6 +499,7 @@ def process_one():
         # POST com resposta perdida é ambíguo: não recriar automaticamente recorrência.
         operation.status, operation.erro = 'REVISAR', 'RECONCILIAR_ANTES_DE_REPETIR'
         db.session.commit()
+        current_app.logger.warning('asaas', extra={'safe_event': 'asaas_operacao_requer_revisao'})
     finally:
         db.session.remove()
     return True

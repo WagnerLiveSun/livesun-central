@@ -346,6 +346,9 @@ def test_failed_event_is_reprocessed_without_duplicate_effect(app):
         assert process_one()
     failed=db.session.scalar(db.select(EventoAsaas).filter_by(evento_externo='sandbox:retry_event'))
     assert failed.status=='FALHA'
+    assert not process_one()
+    failed.atualizado_em -= timedelta(minutes=2)
+    db.session.commit()
 
     payment={'id':'pay_retry','subscription':'sub_test','dueDate':date.today().isoformat(),
              'value':'80.00','status':'CONFIRMED','billingType':'UNDEFINED'}
@@ -354,8 +357,30 @@ def test_failed_event_is_reprocessed_without_duplicate_effect(app):
     db.session.commit()
     failed=db.session.scalar(db.select(EventoAsaas).filter_by(evento_externo='sandbox:retry_event'))
     assert failed.status=='PROCESSADO'
+    assert failed.erro is None
     assert db.session.scalar(db.select(db.func.count()).select_from(Cobranca))==1
     assert obj.status=='TRIAL'
+
+
+def test_failed_asaas_event_does_not_block_other_events_or_operations(app):
+    obj=subscription(app)
+    from app.services.asaas_service import enqueue
+    for event_id in ('bad', 'good'):
+        receive('sandbox','t'*40,{'id':event_id,'event':'PAYMENT_CREATED',
+                                  'payment':{'id':'pay_'+event_id,'subscription':'sub_test'}})
+    enqueue(obj,'CONSULTAR')
+    db.session.commit()
+    payment={'id':'pay_good','subscription':'sub_test','dueDate':date.today().isoformat(),
+             'value':'80.00','status':'PENDING','billingType':'UNDEFINED'}
+    with patch('app.services.asaas_service.AsaasClient.request',side_effect=[TimeoutError(), payment]), \
+         patch('app.services.asaas_service.AsaasClient.pages',return_value=[]):
+        assert process_one()
+        assert process_one()
+        assert process_one()
+        assert not process_one()
+    assert db.session.scalar(db.select(EventoAsaas).filter_by(event_id='bad')).status=='FALHA'
+    assert db.session.scalar(db.select(EventoAsaas).filter_by(event_id='good')).status=='PROCESSADO'
+    assert db.session.scalar(db.select(OperacaoAsaas)).status=='CONCLUIDA'
 
 
 def test_confirmed_and_received_do_not_duplicate_payment_effect(app):
