@@ -253,11 +253,11 @@ def test_monthly_and_annual_server_payload_values(app):
     db.session.commit()
     assert captured[0]['value']==80
     assert captured[0]['cycle']=='MONTHLY'
-    assert captured[0]['billingType']=='BOLETO'
+    assert captured[0]['billingType']=='UNDEFINED'
     assert captured[0]['nextDueDate']==max(obj.trial_ate or date.today(), date.today()).isoformat()
     assert captured[1]['value']==600
     assert captured[1]['cycle']=='YEARLY'
-    assert captured[1]['billingType']=='BOLETO'
+    assert captured[1]['billingType']=='UNDEFINED'
 
 
 def test_repeated_sync_recovers_existing_subscription_without_duplicate(app):

@@ -130,7 +130,7 @@ def configure_subscription(subscription, environment, form, existing_id=None):
     if subscription.status not in ('ATIVA', 'TRIAL'):
         raise BusinessError('Ative a assinatura antes de habilitar cobrança.')
     if subscription.produto.codigo in PROPOSTAS_CODES:
-        form = 'BOLETO'
+        form = 'UNDEFINED'
     elif form not in ('BOLETO', 'PIX'):
         raise BusinessError('Use boleto ou Pix; cartão exige fluxo de tokenização separado.')
     if subscription.asaas_subscription_id and existing_id and existing_id != subscription.asaas_subscription_id:
@@ -199,7 +199,7 @@ def sync_subscription(subscription, client):
                 if expected_period not in PROPOSTAS_VALUES:
                     raise BusinessError('Periodicidade inválida para LiveSun Propostas.')
                 value, cycle = PROPOSTAS_VALUES[expected_period]
-                billing_type = 'BOLETO'
+                billing_type = 'UNDEFINED'
                 value_payload = asaas_value(value)
             else:
                 value_payload = asaas_value(subscription.plano.valor_mensal)
@@ -428,7 +428,7 @@ def start_propostas_contratacao(cliente_id, periodicidade, customer_data=None):
         before = snapshot(existing)
         existing.plano = plan
         existing.plano_id = plan.id
-        configure_subscription(existing, product.config_asaas.ambiente, 'BOLETO')
+        configure_subscription(existing, product.config_asaas.ambiente, 'UNDEFINED')
         record(existing, 'CONTRATACAO_SOLICITADA', before)
         return existing, False
     before = snapshot(customer)
@@ -444,7 +444,7 @@ def start_propostas_contratacao(cliente_id, periodicidade, customer_data=None):
     subscription.asaas_habilitado = True
     record(subscription, 'ASSINATURA_CRIADA', {})
     configure_subscription(subscription, product.config_asaas.ambiente,
-                           'BOLETO')
+                           'UNDEFINED')
     db.session.flush()
     charge = db.session.scalar(db.select(Cobranca).where(
         Cobranca.assinatura_id == subscription.id).order_by(Cobranca.id.desc()))
