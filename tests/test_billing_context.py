@@ -47,6 +47,9 @@ def test_start_charge_uses_product_account_and_subscription_plan(app,client):
     obj.produto.config_asaas=config
     db.session.commit()
     login(client)
+    html=client.get(f'/assinaturas/{obj.id}').get_data(as_text=True)
+    assert 'cliente escolherá a forma de pagamento' in html
+    assert '<input type="hidden" name="forma" value="UNDEFINED">' in html
     with patch('requests.Session.request') as remote:
         response=client.post(f'/assinaturas/{obj.id}/comercial/asaas',data={'forma':'PIX','ambiente':'producao'})
         remote.assert_not_called()
