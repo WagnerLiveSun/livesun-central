@@ -102,9 +102,12 @@ def config_for(environment, product=None):
 
 def webhook_token(config):
     configured = current_app.config.get('ASAAS_WEBHOOK_TOKEN', '').strip()
-    if configured and current_app.config.get('ASAAS_API_URL', '').rstrip('/') != BASES[config.ambiente]:
-        raise BusinessError('Token global Asaas exige URL explícita do mesmo ambiente.')
-    return configured or decrypt(config.webhook_token)
+    configured_url = current_app.config.get('ASAAS_API_URL', '').rstrip('/')
+    # Sem URL global explícita, o token cadastrado na conta é a fonte segura.
+    # Nunca compartilhar um token global entre sandbox e produção por inferência.
+    if configured and configured_url == BASES.get(config.ambiente):
+        return configured
+    return decrypt(config.webhook_token)
 
 
 def enqueue(subscription, kind):
