@@ -12,19 +12,26 @@
 </section>
 
 <section class="card">
-  <h2>Escolha o plano</h2>
   {% if existing %}
-  <p class="badge">Status de acesso: {{ existing.status }}</p>
-  <p>Situação financeira: {{ charges[0].status if charges else 'Aguardando geração da fatura pelo worker' }}</p>
-  <p>{{ existing.plano.nome }} · R$ {{ existing.plano.valor_mensal }} / {{ existing.plano.periodicidade }}</p>
-  {% if existing.liberado_em %}<p>Liberação manual: {{ existing.liberado_por.nome if existing.liberado_por else 'Operador' }} #{{ existing.liberado_por_id }}, {{ existing.liberado_em.strftime('%d/%m/%Y %H:%M') }} UTC.</p>{% endif %}
+  <h2>Boas-vindas ao LiveSun Propostas!</h2>
+  <p>Obrigado por escolher o LiveSun Propostas. A Central de Atendimento LiveSun acompanha a contratação do seu plano.</p>
+  <p><strong>Plano contratado:</strong> {{ existing.plano.nome }} · R$ {{ '%.2f'|format(existing.plano.valor_mensal)|replace('.', ',') }} / {{ existing.plano.periodicidade }}</p>
+  {% if charges and charges[0].status == 'PAGA' %}
+  <p><strong>Pagamento confirmado.</strong> {% if existing.status == 'ATIVA' %}Seu acesso está ativo.{% else %}A liberação do plano contratado está pendente de análise pela Central de Atendimento LiveSun e será realizada em até 24 horas após a confirmação do pagamento.{% endif %}</p>
+  {% elif charges and charges[0].status in ['CANCELADA', 'ESTORNADA', 'FALHA'] %}
+  <p>Não foi possível concluir a cobrança. A Central de Atendimento LiveSun poderá ajudar você a regularizar a contratação.</p>
+  {% else %}
+  <p>O boleto para pagamento do plano será encaminhado para o e-mail cadastrado, <strong>{{ customer.email_principal }}</strong>, após a geração da cobrança. Se não recebê-lo, entre em contato com a Central de Atendimento LiveSun.</p>
+  <p>A liberação do plano contratado está pendente de análise pela Central de Atendimento LiveSun e será realizada em até 24 horas após a confirmação do pagamento.</p>
+  {% endif %}
+  {% if existing.status == 'TRIAL' %}<p>O período de teste permanece sujeito às condições da sua assinatura.</p>{% elif existing.status == 'ATIVA' and not (charges and charges[0].status == 'PAGA') %}<p>Seu acesso atual está ativo, conforme as condições da sua assinatura.</p>{% endif %}
   {% for charge in charges %}
     {% if charge.invoice_url %}
-    <p><a class="button primary" href="{{ charge.invoice_url }}" target="_blank" rel="noopener noreferrer">Abrir fatura Asaas</a></p>
+    <p><a class="button primary" href="{{ charge.invoice_url }}" target="_blank" rel="noopener noreferrer">Abrir cobrança</a></p>
     {% endif %}
   {% endfor %}
-  <p>O acesso será liberado somente após validação manual pelo operador.</p>
   {% else %}
+  <h2>Escolha o plano</h2>
   <div class="form-grid">
     <label>Plano
       <select name="periodicidade" form="contratacao" required>
