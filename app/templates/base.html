@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="pt-BR" data-theme="moonlight">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{{ title or 'Login' }} · LiveSun Central</title><link rel="stylesheet" href="{{ url_for('static', filename='css/central.css') }}"><script src="{{ url_for('static', filename='js/central.js', v='billing-review-4') }}" defer></script></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{{ title or 'Login' }} · LiveSun Central</title><link rel="stylesheet" href="{{ url_for('static', filename='css/central.css', v='navigation-billing-5') }}"><script src="{{ url_for('static', filename='js/central.js', v='billing-review-5') }}" defer></script></head>
 <body>
 <header><a class="brand" href="{{ url_for('admin.dashboard') }}"><img src="{{ url_for('static',filename='images/logo.png') }}" alt="LiveSun Tecnologia"><span>CENTRAL<small>Gestão de assinaturas</small></span></a><div class="actions"><button type="button" id="theme-toggle">Alternar tema</button>{% if current_user.is_authenticated %}<button type="button" id="menu-toggle" aria-controls="sidebar" aria-expanded="false">Menu</button><form action="{{ url_for('admin.logout_view') }}" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button>Sair</button></form>{% endif %}</div></header>
 {% if current_user.is_authenticated %}<aside id="sidebar"><p><strong>{{ current_user.nome }}</strong><small>{{ current_user.perfil }}</small></p><nav>

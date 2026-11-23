@@ -63,7 +63,8 @@ def test_ineligible_subscription_cannot_be_charged_even_by_direct_post(app, clie
     db.session.commit()
     login(client)
     html = client.get('/cobrancas').get_data(as_text=True)
-    assert 'Nenhuma assinatura elegível' in html
+    assert 'Nenhuma assinatura disponível para registro manual' in html
+    assert obj.plano.nome in html and obj.cliente.razao_social in html
     assert client.post('/cobrancas', data=form(obj)).status_code == 422
     assert not db.session.scalar(db.select(Cobranca))
 

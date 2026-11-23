@@ -1,6 +1,6 @@
-from flask import render_template, request, redirect, url_for
+from flask import current_app, render_template, request, redirect, url_for
 from app.extensions import db
-from app.models import Cobranca, Assinatura, Cliente
+from app.models import Cobranca, Assinatura, OperacaoAsaas
 from app.schemas import ChargeInput
 from app.security import operator_required
 from app.services.cobranca_service import create_charge, pay
@@ -16,7 +16,14 @@ def charges():
     subscriptions = db.session.scalars(db.select(Assinatura).order_by(Assinatura.id.desc())).all()
     contexts = {s.id:s for s in subscriptions}
     eligible = [s for s in subscriptions if s.status == 'ATIVA' and not s.cortesia and not s.asaas_habilitado]
-    return render_template('charges.html', title='Cobranças', page=page, subscriptions=eligible, contexts=contexts)
+    latest_ids = (db.select(db.func.max(OperacaoAsaas.id).label('id'))
+        .where(OperacaoAsaas.tipo == 'SINCRONIZAR')
+        .group_by(OperacaoAsaas.assinatura_id).subquery())
+    operations = db.session.scalars(db.select(OperacaoAsaas).join(latest_ids, OperacaoAsaas.id == latest_ids.c.id)).all()
+    latest = {operation.assinatura_id: operation for operation in operations}
+    return render_template('charges.html', title='Cobranças', page=page, subscriptions=eligible,
+        all_subscriptions=subscriptions, contexts=contexts, operations=latest,
+        production=current_app.config['APP_ENV'] == 'production')
 
 
 @admin.post('/cobrancas')

@@ -1,6 +1,6 @@
 import secrets
 from datetime import date
-from flask import render_template, request, redirect, url_for, abort, flash
+from flask import current_app, render_template, request, redirect, url_for, abort, flash
 from app.extensions import db
 from app.models import Produto, ConfigAsaas, CredencialServico, EventoAsaas, OperacaoAsaas, Assinatura, PurgaProduto, Cobranca
 from app.security import operator_required, issue_product_credential, encrypt
@@ -171,6 +171,8 @@ def commercial_action(identifier, action):
         config = obj.produto.config_asaas
         if not config or not config.ativo:
             raise BusinessError('Configure a cobrança no cadastro do produto primeiro.')
+        if current_app.config['APP_ENV'] == 'production' and config.ambiente != 'producao':
+            raise BusinessError('A conta de cobrança deste produto está em testes. Configure uma conta de produção antes de iniciar recorrência.')
         if config.ambiente == 'producao' and request.form.get('confirmacao') != 'COBRAR':
             raise BusinessError('Confirme COBRAR para habilitar recorrência em produção.')
         configure_subscription(obj, config.ambiente, request.form.get('forma','BOLETO'))
