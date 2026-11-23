@@ -65,7 +65,7 @@ def test_named_provider_does_not_select_a_hardcoded_process(app, client):
     rows = db.session.scalars(db.select(GatewayAlternativo).order_by(GatewayAlternativo.nome)).all()
     assert [row.nome for row in rows] == ['Banco Inter', 'Outro Banco']
     html = client.get('/configuracoes/gateways').get_data(as_text=True)
-    assert 'Adicionar integração de pagamento' in html
+    assert 'Adicionar integração de pagamento alternativa' in html
     assert 'Configurar Banco Inter' not in html and 'objeto JSON' not in html
     assert 'não emite cobranças' in html
 

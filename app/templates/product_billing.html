@@ -5,7 +5,7 @@
 <div class="actions"><a class="button" href="{{ url_for('admin.subscriptions',produto=product.id) }}">Assinaturas deste produto</a><a class="button" href="{{ url_for('admin.listing',kind='planos',produto=product.id) }}">Planos e preços</a></div></section>
 <section class="card"><h2>Resumo financeiro</h2><p>Assinaturas: {{ subscriptions|selectattr('status','equalto','ATIVA')|list|length }} ativas · {{ subscriptions|selectattr('status','equalto','TRIAL')|list|length }} em trial · {{ subscriptions|selectattr('cortesia')|list|length }} cortesias · {{ subscriptions|selectattr('status','equalto','SUSPENSA')|list|length }} suspensas.</p><p>Cobranças: {{ charge_counts.get('ABERTA',0) + charge_counts.get('AGUARDANDO_PAGAMENTO',0) }} abertas · {{ charge_counts.get('ATRASADA',0) + charge_counts.get('VENCIDA',0) }} vencidas · {{ charge_counts.get('PAGA',0) }} pagas · {{ charge_counts.get('FALHA',0) }} com falha.</p><a class="button" href="{{ url_for('admin.charges') }}">Ver cobranças</a></section>
 {% if current_user.perfil == 'superadmin' %}
-<section class="card"><h2>Configuração de cobrança</h2>
+<section class="card" id="configuracao-cobranca"><h2>Configuração de cobrança</h2>
 <p>{{ 'Configurada · ' ~ config.ambiente|capitalize if config else 'Ainda não configurada' }}</p>
 <form method="post" action="{{ url_for('admin.asaas_config') }}" class="form-grid">
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="produto_id" value="{{ product.id }}">

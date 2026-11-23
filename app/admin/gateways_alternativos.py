@@ -1,6 +1,6 @@
 from urllib.parse import urlsplit
 
-from flask import render_template, request, redirect, url_for, flash
+from flask import current_app, render_template, request, redirect, url_for, flash
 from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
@@ -73,7 +73,12 @@ def alternative_gateways():
     rows = db.session.scalars(db.select(GatewayAlternativo).order_by(GatewayAlternativo.nome, GatewayAlternativo.id)).all()
     products = db.session.scalars(db.select(Produto).order_by(Produto.nome)).all()
     banks = db.session.scalars(db.select(InstituicaoBancaria).order_by(InstituicaoBancaria.codigo_banco)).all()
-    return render_template('alternative_gateways.html', title='Integrações de pagamento', rows=rows, products=products, banks=banks)
+    return render_template('alternative_gateways.html', title='Integrações de pagamento', rows=rows,
+        products=products, banks=banks,
+        asaas_global_override=bool(current_app.config.get('ASAAS_API_KEY', '').strip()
+            or current_app.config.get('ASAAS_API_URL', '').strip()
+            or current_app.config.get('ASAAS_WEBHOOK_TOKEN', '').strip()),
+        production=current_app.config['APP_ENV'] == 'production')
 
 
 @admin.post('/configuracoes/gateways')
