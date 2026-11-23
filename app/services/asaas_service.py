@@ -18,6 +18,14 @@ PROPOSTAS_CODES = {'PROPOSTAS', 'LIVE_SUN_PROPOSTAS'}
 PROPOSTAS_VALUES = {'mensal': (Decimal('80.00'), 'MONTHLY'), 'anual': (Decimal('600.00'), 'YEARLY')}
 
 
+class AsaasRequestError(BusinessError):
+    """Erro sanitizado; somente falhas de leitura são retomadas automaticamente."""
+    def __init__(self, category, safe_to_retry=False):
+        super().__init__('Não foi possível concluir a comunicação com o Asaas.')
+        self.category = category
+        self.safe_to_retry = safe_to_retry
+
+
 def safe_invoice_url(value, environment):
     try:
         parsed = urlsplit(value or '')
@@ -54,11 +62,22 @@ class AsaasClient:
     def request(self, method, path, **kwargs):
         with requests.Session() as http:
             http.trust_env = False
-            response = http.request(method, self.base + path, headers={
-                'access_token': self.key, 'User-Agent': 'LiveSun-Central/1.0',
-                'Content-Type': 'application/json'}, timeout=(5, 20), allow_redirects=False, **kwargs)
+            try:
+                response = http.request(method, self.base + path, headers={
+                    'access_token': self.key, 'User-Agent': 'LiveSun-Central/1.0',
+                    'Content-Type': 'application/json'}, timeout=(5, 20), allow_redirects=False, **kwargs)
+            except requests.RequestException:
+                raise AsaasRequestError('ASAAS_CONEXAO_LEITURA' if method == 'GET' else 'ASAAS_RESPOSTA_INDEFINIDA',
+                                        safe_to_retry=method == 'GET') from None
             if not 200 <= response.status_code < 300:
-                raise BusinessError('Asaas recusou a operação. Confira ambiente e configuração.')
+                if response.status_code in (401, 403):
+                    category = 'ASAAS_AUTENTICACAO'
+                elif response.status_code == 429 or response.status_code >= 500:
+                    category = 'ASAAS_INDISPONIVEL' if method == 'GET' else 'ASAAS_RESPOSTA_INDEFINIDA'
+                else:
+                    category = 'ASAAS_REQUISICAO_RECUSADA'
+                raise AsaasRequestError(category, safe_to_retry=method == 'GET'
+                    and (response.status_code == 429 or response.status_code >= 500))
             return response.json() if response.content else {}
 
     def pages(self, path, params=None):
@@ -487,15 +506,22 @@ def process_one():
             for payment in client.pages('/subscriptions/' + quote(subscription.asaas_subscription_id, safe='') + '/payments'):
                 apply_payment(subscription, payment)
         operation.status = 'CONCLUIDA'
+        operation.erro = None
         audit(subscription, 'ASAAS_OPERACAO_CONCLUIDA')
         db.session.commit()
-    except Exception:
+    except Exception as error:
         db.session.rollback()
         operation = db.session.get(OperacaoAsaas, identifier)
-        # POST com resposta perdida é ambíguo: não recriar automaticamente recorrência.
-        operation.status, operation.erro = 'REVISAR', 'RECONCILIAR_ANTES_DE_REPETIR'
+        if isinstance(error, AsaasRequestError) and error.safe_to_retry:
+            operation.status, operation.erro = 'PENDENTE', error.category
+            operation.proxima_tentativa = now() + timedelta(seconds=min(3600, 30 * 2 ** min(operation.tentativas - 1, 7)))
+        else:
+            # Resposta perdida em escrita pode já ter gerado cobrança.
+            operation.status = 'REVISAR'
+            operation.erro = error.category if isinstance(error, AsaasRequestError) else 'RECONCILIAR_ANTES_DE_REPETIR'
         db.session.commit()
-        current_app.logger.warning('asaas', extra={'safe_event': 'asaas_operacao_requer_revisao'})
+        current_app.logger.warning('asaas', extra={'safe_event': 'asaas_operacao_' +
+            ('nova_tentativa' if operation.status == 'PENDENTE' else 'requer_revisao')})
     finally:
         db.session.remove()
     return True
