@@ -47,11 +47,14 @@ def test_start_charge_uses_product_account_and_subscription_plan(app,client):
     obj.produto.config_asaas=config
     db.session.commit()
     login(client)
+    html=client.get(f'/assinaturas/{obj.id}').get_data(as_text=True)
+    assert 'Forma de pagamento: boleto.' in html
+    assert '<input type="hidden" name="forma" value="BOLETO">' in html
     with patch('requests.Session.request') as remote:
         response=client.post(f'/assinaturas/{obj.id}/comercial/asaas',data={'forma':'PIX','ambiente':'producao'})
         remote.assert_not_called()
     assert response.status_code==302
-    assert obj.asaas_ambiente=='sandbox' and obj.asaas_forma=='UNDEFINED'
+    assert obj.asaas_ambiente=='sandbox' and obj.asaas_forma=='BOLETO'
     op=db.session.scalar(db.select(OperacaoAsaas))
     assert op.assinatura_id==obj.id
     assert db.session.scalar(db.select(db.func.count()).select_from(Cobranca))==0
