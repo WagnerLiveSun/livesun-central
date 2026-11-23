@@ -82,8 +82,8 @@ def test_existing_trial_reused_without_reset_and_repeated_checkout(app, period):
 def test_environment_url_and_customer_id_cannot_cross(app):
     obj = subscription(app)
     app.config['ASAAS_API_URL'] = 'https://api.asaas.com/v3'
-    with pytest.raises(BusinessError):
-        AsaasClient(obj.produto.config_asaas)
+    assert AsaasClient(obj.produto.config_asaas).base == 'https://api-sandbox.asaas.com/v3'
+    assert AsaasClient(obj.produto.config_asaas).key == 'fake'
     obj.asaas_subscription_id = None
     obj.asaas_customer_id = 'cus_sandbox'
     obj.produto.config_asaas.ambiente = 'producao'

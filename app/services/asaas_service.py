@@ -51,13 +51,14 @@ class AsaasClient:
     def __init__(self, config):
         environment = config.ambiente
         configured_url = current_app.config.get('ASAAS_API_URL', '').rstrip('/')
-        if environment not in BASES or (configured_url and configured_url != BASES[environment]):
-            raise BusinessError('URL Asaas incompatível com o ambiente do vínculo.')
+        if environment not in BASES:
+            raise BusinessError('Ambiente Asaas inválido.')
         self.base = BASES[environment]
         configured_key = current_app.config.get('ASAAS_API_KEY', '').strip()
-        if configured_key and configured_url != BASES[environment]:
-            raise BusinessError('Chave global Asaas exige URL explícita do mesmo ambiente.')
-        self.key = configured_key or decrypt(config.api_key)
+        # Chaves globais só podem ser usadas quando a URL fixa comprova o ambiente.
+        # Caso contrário, use a credencial isolada já configurada para esta conta.
+        self.key = (configured_key if configured_key and configured_url == self.base
+                    else decrypt(config.api_key))
 
     def request(self, method, path, **kwargs):
         with requests.Session() as http:
@@ -192,7 +193,7 @@ def sync_subscription(subscription, client):
                 elif subscription.asaas_ambiente == 'producao':
                     customer.asaas_producao_customer_id = created['id']
                 db.session.commit()
-            due = subscription.trial_ate or subscription.data_proxima_cobranca or date.today()
+            due = (subscription.trial_ate if subscription.status == 'TRIAL' else None) or subscription.data_proxima_cobranca or date.today()
             if subscription.produto.codigo in PROPOSTAS_CODES:
                 expected_period = subscription.plano.periodicidade
                 if expected_period not in PROPOSTAS_VALUES:
@@ -206,7 +207,7 @@ def sync_subscription(subscription, client):
                 billing_type = subscription.asaas_forma
             created = client.request('POST', '/subscriptions', json={
                 'customer': subscription.asaas_customer_id, 'billingType': billing_type,
-                'value': value_payload, 'nextDueDate': date.today().isoformat(),
+                'value': value_payload, 'nextDueDate': max(due, date.today()).isoformat(),
                 'cycle': cycle,
                 'externalReference': ref, 'description': f'{subscription.produto.nome} / {subscription.plano.nome}'})
             subscription.asaas_subscription_id = created['id']
@@ -221,7 +222,7 @@ def sync_subscription(subscription, client):
                         updatePendingPayments=False,
                         cycle='YEARLY' if subscription.plano.periodicidade == 'anual' else 'MONTHLY')
             if remote.get('status') == 'INACTIVE':
-                due = subscription.trial_ate or subscription.data_proxima_cobranca or date.today()
+                due = (subscription.trial_ate if subscription.status == 'TRIAL' else None) or subscription.data_proxima_cobranca or date.today()
                 body['nextDueDate'] = max(due, date.today()).isoformat()
         client.request('PUT', '/subscriptions/' + quote(subscription.asaas_subscription_id, safe=''), json=body)
     # Cobranças já emitidas não são canceladas silenciosamente por suspensão.

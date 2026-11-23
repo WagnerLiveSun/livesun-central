@@ -62,8 +62,9 @@ def test_sandbox_worker_in_production_uses_sandbox_url_and_creates_charge(app):
 def test_sandbox_does_not_use_production_global_credential(app):
     obj = subscription(app)
     app.config.update(APP_ENV='production', ASAAS_API_URL='https://api.asaas.com/v3', ASAAS_API_KEY='production-secret')
-    with pytest.raises(BusinessError):
-        AsaasClient(obj.produto.config_asaas)
+    client = AsaasClient(obj.produto.config_asaas)
+    assert client.base == 'https://api-sandbox.asaas.com/v3'
+    assert client.key == 'fake'
 
 
 def test_unknown_environment_and_cross_environment_binding_are_rejected(app):
@@ -71,3 +72,53 @@ def test_unknown_environment_and_cross_environment_binding_are_rejected(app):
     obj.produto.config_asaas.ambiente = 'invalid'
     with pytest.raises(BusinessError):
         AsaasClient(obj.produto.config_asaas)
+
+
+def test_global_key_without_explicit_url_uses_configured_account(app):
+    obj = subscription(app)
+    app.config.update(APP_ENV='production', ASAAS_API_URL='', ASAAS_API_KEY='global-key')
+    client = AsaasClient(obj.produto.config_asaas)
+    assert client.base == 'https://api-sandbox.asaas.com/v3'
+    assert client.key == 'fake'
+
+
+def test_matching_global_url_can_use_global_key(app):
+    obj = subscription(app)
+    app.config.update(ASAAS_API_URL='https://api-sandbox.asaas.com/v3', ASAAS_API_KEY='sandbox-global')
+    assert AsaasClient(obj.produto.config_asaas).key == 'sandbox-global'
+
+
+@pytest.mark.parametrize('status,trial_offset,due_offset,expected_offset', [
+    ('TRIAL', 7, None, 7),
+    ('ATIVA', None, 15, 15),
+    ('ATIVA', None, -2, 0),
+    ('ATIVA', None, None, 0),
+])
+def test_recurring_first_due_date_respects_subscription(app, status, trial_offset, due_offset, expected_offset):
+    from datetime import timedelta
+    from app.services.asaas_service import sync_subscription
+    obj = subscription(app)
+    obj.produto.codigo = 'COMERCIAL'
+    obj.status = status
+    obj.asaas_subscription_id = None
+    obj.asaas_customer_id = 'existing-test-customer'
+    obj.trial_ate = date.today() + timedelta(days=trial_offset) if trial_offset is not None else None
+    obj.data_proxima_cobranca = date.today() + timedelta(days=due_offset) if due_offset is not None else None
+    sent = []
+
+    class Remote:
+        def pages(self, path, params=None):
+            return iter(())
+
+        def request(self, method, path, **kwargs):
+            if method == 'POST' and path == '/subscriptions':
+                sent.append(kwargs['json'])
+                return {'id':'subscription-test'}
+            if method == 'GET':
+                return {'id':'subscription-test','customer':'existing-test-customer','status':'ACTIVE'}
+            if method == 'PUT':
+                return {'id':'subscription-test'}
+            raise AssertionError((method, path))
+
+    sync_subscription(obj, Remote())
+    assert sent[0]['nextDueDate'] == (date.today() + timedelta(days=expected_offset)).isoformat()
