@@ -42,8 +42,6 @@ def asaas_value(value):
 class AsaasClient:
     def __init__(self, config):
         environment = config.ambiente
-        if current_app.config['APP_ENV'] == 'production' and environment == 'sandbox':
-            raise BusinessError('Fluxo financeiro de produção não processa vínculos sandbox.')
         configured_url = current_app.config.get('ASAAS_API_URL', '').rstrip('/')
         if environment not in BASES or (configured_url and configured_url != BASES[environment]):
             raise BusinessError('URL Asaas incompatível com o ambiente do vínculo.')
@@ -384,8 +382,6 @@ def start_propostas_contratacao(cliente_id, periodicidade, customer_data=None):
         codigo='PROPOSTAS', ativo=True))
     if not product or not product.config_asaas or not product.config_asaas.ativo:
         raise BusinessError('Configure a cobrança do LiveSun Propostas antes da contratação.')
-    if current_app.config['APP_ENV'] == 'production' and product.config_asaas.ambiente != 'producao':
-        raise BusinessError('Contratação de produção exige configuração Asaas de produção.')
     if periodicidade not in PROPOSTAS_VALUES:
         raise BusinessError('Plano inválido.')
     existing = db.session.scalar(db.select(Assinatura).where(

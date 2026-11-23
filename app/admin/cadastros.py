@@ -1,4 +1,4 @@
-from flask import current_app, render_template, request, redirect, url_for, flash
+from flask import render_template, request, redirect, url_for, flash
 from datetime import date, datetime, time, timedelta
 from app.extensions import db
 from app.models import SolicitacaoCadastro, Cliente, Plano, Produto
@@ -136,8 +136,6 @@ def enable_registration(identifier):
         config = subscription.produto.config_asaas
         if not config or not config.ativo:
             raise BusinessError('Integração de pagamento não configurada para este produto.')
-        if current_app.config['APP_ENV'] == 'production' and config.ambiente != 'producao':
-            raise BusinessError('A conta de cobrança deste produto está em testes. Configure uma conta de produção antes de iniciar recorrência.')
         if subscription.cortesia:
             raise BusinessError('Assinatura em cortesia não pode iniciar cobrança.')
         if subscription.asaas_habilitado:

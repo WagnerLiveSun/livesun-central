@@ -154,16 +154,15 @@ def test_renewal_paid_keeps_active(app):
     assert obj.status == 'ATIVA'
 
 
-def test_production_refuses_sandbox_billing_and_release(app, client):
+def test_production_sandbox_billing_does_not_release_real_access(app, client):
     obj = subscription(app)
     apply_payment(obj, payment())
     db.session.commit()
     login(client)
     app.config['APP_ENV'] = 'production'
-    with pytest.raises(BusinessError):
-        AsaasClient(obj.produto.config_asaas)
-    with pytest.raises(BusinessError):
-        start_propostas_contratacao(obj.cliente_id, 'mensal')
+    gateway = AsaasClient(obj.produto.config_asaas)
+    assert gateway.base == 'https://api-sandbox.asaas.com/v3'
+    assert start_propostas_contratacao(obj.cliente_id, 'mensal')[0].id == obj.id
     response = client.post(f'/assinaturas/{obj.id}/liberar', base_url='https://localhost')
     assert response.status_code == 422
     assert obj.status == 'TRIAL'

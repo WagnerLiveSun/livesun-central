@@ -21,7 +21,7 @@ def test_existing_asaas_configuration_is_visible_without_copying_or_exposing_sec
     assert response.status_code == 200
     assert 'Asaas por produto' in html
     assert product.nome in html and 'Asaas · Testes' in html
-    assert 'Ativa em testes; não processa cobranças neste ambiente de produção' in html
+    assert 'Ativa em testes; cobranças não são reais' in html
     assert 'Outro produto' in html and 'Nenhuma conta vinculada' in html
     assert f'/produtos/{product.id}/cobranca#configuracao-cobranca' in html
     assert 'secret-key-example' not in html and 'webhook-secret-example' not in html

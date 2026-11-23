@@ -28,7 +28,7 @@ def test_billing_page_shows_asaas_subscription_and_pending_review(app, client):
     assert 'Nenhuma assinatura disponível para registro manual' in html
 
 
-def test_production_sandbox_cannot_enqueue_recurrence(app, client):
+def test_production_can_enqueue_sandbox_recurrence(app, client):
     obj = create({**app.test_ids, 'status': 'ATIVA'})
     obj.plano.valor_mensal = 80
     obj.produto.config_asaas = ConfigAsaas(ambiente='sandbox', api_key=encrypt('fake'),
@@ -36,19 +36,19 @@ def test_production_sandbox_cannot_enqueue_recurrence(app, client):
     db.session.commit()
     login(client)
     app.config['APP_ENV'] = 'production'
+    html = client.get(f'/assinaturas/{obj.id}', base_url='https://localhost').get_data(as_text=True)
+    assert 'Modo de teste (sandbox)' in html
+    assert 'data-dialog="cobrar-' in html
     with patch('requests.Session.request') as remote:
         response = client.post(f'/assinaturas/{obj.id}/comercial/asaas', data={'forma':'PIX'},
                                base_url='https://localhost')
         remote.assert_not_called()
-    assert response.status_code == 422
-    assert 'conta de cobrança deste produto está em testes' in response.get_data(as_text=True)
-    assert not db.session.scalar(db.select(OperacaoAsaas))
-    html = client.get(f'/assinaturas/{obj.id}', base_url='https://localhost').get_data(as_text=True)
-    assert 'conta deste produto está configurada em testes' in html
-    assert 'data-dialog="cobrar-' not in html
+    assert response.status_code == 302
+    operation = db.session.scalar(db.select(OperacaoAsaas))
+    assert operation.status == 'PENDENTE' and obj.asaas_ambiente == 'sandbox'
 
 
-def test_production_onboarding_sandbox_is_rolled_back(app, client):
+def test_production_onboarding_can_enqueue_sandbox(app, client):
     product = db.session.get(Produto, app.test_ids['produto_id'])
     product.planos[0].valor_mensal = 80
     product.config_asaas = ConfigAsaas(ambiente='sandbox', api_key=encrypt('fake'),
@@ -60,5 +60,7 @@ def test_production_onboarding_sandbox_is_rolled_back(app, client):
     response = client.post(f'/cadastros-recebidos/{row.id}/habilitar', base_url='https://localhost', data={
         'plano_id': app.test_ids['plano_id'], 'modalidade': 'recorrencia', 'forma':'PIX',
         'confirmacao':'CONFIRMAR', 'motivo':'Aprovação comercial'})
-    assert response.status_code == 422
-    assert row.status == 'PENDENTE' and not db.session.scalar(db.select(OperacaoAsaas))
+    assert response.status_code == 302
+    assert row.status == 'VINCULO_PENDENTE'
+    assert row.assinatura.asaas_ambiente == 'sandbox'
+    assert db.session.scalar(db.select(OperacaoAsaas)).status == 'PENDENTE'

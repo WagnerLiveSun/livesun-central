@@ -9,11 +9,12 @@
   <td>{% if sub.cortesia or sub.status == 'TRIAL' %}Sem cobrança nesta condição
       {% elif sub.status != 'ATIVA' %}Assinatura não está ativa
       {% elif op and op.status in ['REVISAR','EXECUTANDO'] %}Solicitação precisa de revisão
-      {% elif sub.asaas_habilitado and production and sub.asaas_ambiente != 'producao' %}Integração em testes; não emite cobrança de produção
+      {% elif sub.asaas_habilitado and sub.asaas_ambiente == 'sandbox' and sub.asaas_subscription_id %}Recorrência de teste vinculada
+      {% elif sub.asaas_habilitado and sub.asaas_ambiente == 'sandbox' %}Recorrência de teste ainda não confirmada
       {% elif sub.asaas_habilitado and sub.asaas_subscription_id %}Recorrência vinculada
       {% elif sub.asaas_habilitado %}Recorrência ainda não confirmada
       {% elif not config or not config.ativo %}Integração não configurada
-      {% elif production and config.ambiente != 'producao' %}Integração em testes
+      {% elif config.ambiente == 'sandbox' %}Disponível para iniciar teste
       {% else %}Disponível para iniciar{% endif %}</td>
   <td><a class="button" href="{{ url_for('admin.subscription',identifier=sub.id) }}#cobranca">Abrir assinatura</a></td></tr>
   {% else %}<tr><td colspan="6">Nenhuma assinatura cadastrada. Cadastre uma assinatura para gerenciar a cobrança.</td></tr>{% endfor %}
