@@ -28,7 +28,7 @@ def test_page_and_prepare_do_not_create_subscription_or_charge(app, client):
     with patch('app.services.empresas_propostas_service.list_companies', return_value=([company()], None)):
         page = client.get('/empresas-propostas')
     assert page.status_code == 200
-    assert 'Cadastrar cliente e vincular' in page.get_data(as_text=True)
+    assert 'Preparar onboarding' in page.get_data(as_text=True)
     before = db.session.scalar(db.select(db.func.count()).select_from(Cliente))
     with patch('app.services.empresas_propostas_service.fetch', return_value={'produto':'PROPOSTAS','empresa':company()}):
         response = client.post('/empresas-propostas/10/cadastrar')

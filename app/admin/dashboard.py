@@ -26,7 +26,7 @@ def dashboard():
 
 
 @admin.get('/configuracoes')
-@operator_required()
+@operator_required('superadmin')
 def settings():
     return render_template('settings.html', title='Configurações', engine=current_app.config['DB_ENGINE'],
                            ttl=current_app.config['ENTITLEMENT_TTL_SECONDS'])

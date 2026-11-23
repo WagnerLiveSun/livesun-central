@@ -8,11 +8,20 @@ from .auditoria_service import audit, snapshot
 
 def create_charge(data):
     subscription = locked(data['assinatura_id'])
-    if subscription.status in ('EXCLUIDA', 'CANCELADA', 'EXPIRADA'):
-        raise BusinessError('Assinatura encerrada.')
-    if subscription.cortesia and (not subscription.cortesia_ate or subscription.cortesia_ate >= date.today()):
+    if subscription.cortesia:
         raise BusinessError('Assinatura bonificada: cobrança não será criada.')
-    charge = Cobranca(**data, status='ABERTA')
+    if subscription.status != 'ATIVA':
+        raise BusinessError('Somente assinaturas ativas podem receber nova cobrança; trial não gera cobrança.')
+    if subscription.asaas_habilitado:
+        raise BusinessError('Assinatura com cobrança Asaas habilitada. Não crie registro local para evitar conflito; confira a integração.')
+    tipo = data.get('tipo', 'plano')
+    if tipo not in ('plano', 'avulsa'):
+        raise BusinessError('Tipo de cobrança inválido.')
+    valor = subscription.plano.valor_mensal if tipo == 'plano' else data.get('valor')
+    if valor is None or valor <= 0:
+        raise BusinessError('Informe um valor de cobrança maior que zero.')
+    charge = Cobranca(assinatura_id=subscription.id, competencia=data['competencia'],
+                      valor=valor, vencimento=data['vencimento'], status='ABERTA')
     db.session.add(charge)
     db.session.flush()
     audit(charge, 'COBRANCA_CRIADA')
@@ -21,7 +30,7 @@ def create_charge(data):
 
 
 def pay(charge):
-    if charge.status not in ('ABERTA', 'ATRASADA'):
+    if charge.status not in ('ABERTA', 'ATRASADA', 'VENCIDA', 'AGUARDANDO_PAGAMENTO'):
         raise BusinessError('Cobrança não está em aberto.')
     subscription = locked(charge.assinatura_id)
     before = snapshot(charge)

@@ -1,5 +1,9 @@
 # Scripts SQL para instalação após homologação
 
+**Instituições bancárias (PostgreSQL):** para atualizar exclusivamente da revisão
+`20261119_03` para `20261123_02`, veja as instruções e os cuidados em
+`D:\App_LiveSun\LiveSun_CentralControle\livesun-central\docs\INSTITUICOES_BANCARIAS_CENTRAL.md`.
+
 Atualização desta etapa: para um Central já na revisão `20261112_01`, use somente `03_atualizar_20261112_01_para_head.sql` do dialeto correspondente, ou `flask db upgrade`. O script `01` passou a conter toda a cadeia e continua exclusivo de banco vazio. Nunca aplique o incremental em banco já na revisão `20261112_02`.
 
 Arquivos gerados a partir das migrations, sem senha, token, cliente, assinatura de teste ou usuário administrativo:

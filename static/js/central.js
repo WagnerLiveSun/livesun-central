@@ -43,3 +43,37 @@ if (productSelect && planSelect) {
   };
   productSelect.addEventListener('change', filterPlans); filterPlans();
 }
+const chargeForm = document.getElementById('charge-form');
+if (chargeForm) {
+  const subscription = chargeForm.querySelector('[name="assinatura_id"]');
+  const kind = chargeForm.querySelector('[name="tipo"]');
+  const amount = chargeForm.querySelector('[name="valor"]');
+  const period = document.getElementById('charge-period');
+  const updateCharge = () => {
+    const option = subscription.selectedOptions[0];
+    amount.value = option?.dataset.value || '';
+    amount.readOnly = kind.value !== 'avulsa';
+    amount.required = kind.value === 'avulsa';
+    period.textContent = kind.value === 'avulsa' ? 'Valor avulso sugerido pelo plano; pode ser alterado.' :
+      `${option?.dataset.period || ''} · O valor do plano é definido pelo Central.`;
+  };
+  subscription.addEventListener('change', updateCharge);
+  kind.addEventListener('change', updateCharge);
+  updateCharge();
+}
+const onboarding = document.getElementById('onboarding-form');
+if (onboarding) {
+  const kind = onboarding.querySelector('[name="modalidade"]');
+  const plan = onboarding.querySelector('[name="plano_id"]');
+  const recurring = document.getElementById('onboarding-recurring');
+  const oneOff = document.getElementById('onboarding-one-off');
+  const updateOnboarding = () => {
+    recurring.hidden = kind.value !== 'recorrencia';
+    oneOff.hidden = kind.value !== 'avulsa';
+    oneOff.querySelectorAll('input').forEach((input) => { input.required = !oneOff.hidden; });
+    if (!oneOff.hidden) oneOff.querySelector('[name="valor"]').value = plan.selectedOptions[0]?.dataset.value || '';
+  };
+  kind.addEventListener('change', updateOnboarding);
+  plan.addEventListener('change', updateOnboarding);
+  updateOnboarding();
+}

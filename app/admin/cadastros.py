@@ -1,4 +1,5 @@
 from flask import render_template, request, redirect, url_for, flash
+from datetime import date, datetime, time, timedelta
 from app.extensions import db
 from app.models import SolicitacaoCadastro, Cliente, Plano, Produto
 from app.security import operator_required
@@ -45,10 +46,29 @@ def prepare_propostas_company(identifier):
 @operator_required('superadmin','comercial','suporte','auditor')
 def received_registrations():
     query=db.select(SolicitacaoCadastro).order_by(SolicitacaoCadastro.id.desc())
-    if request.args.get('status') in ('PENDENTE','VINCULO_PENDENTE','VINCULADA'):
+    if request.args.get('status') in ('PENDENTE','VINCULO_PENDENTE','VINCULADA','RECUSADA'):
         query=query.where(SolicitacaoCadastro.status==request.args['status'])
+    product_id = request.args.get('produto', type=int)
+    if product_id:
+        query = query.where(SolicitacaoCadastro.produto_id == product_id)
+    name = request.args.get('nome', '').strip()[:100]
+    if name:
+        query = query.where(SolicitacaoCadastro.razao_social.icontains(name, autoescape=True))
+    document = ''.join(c for c in request.args.get('documento', '') if c.isdigit())
+    if document:
+        query = query.where(SolicitacaoCadastro.cnpj_cpf.contains(document, autoescape=True))
+    for field, is_end in (('inicio', False), ('fim', True)):
+        raw = request.args.get(field, '').strip()
+        if raw:
+            try:
+                day = date.fromisoformat(raw)
+                boundary = datetime.combine(day, time.min) + (timedelta(days=1) if is_end else timedelta())
+            except (ValueError, OverflowError):
+                raise BusinessError('Data do filtro inválida.') from None
+            query = query.where(SolicitacaoCadastro.criado_em < boundary if is_end else SolicitacaoCadastro.criado_em >= boundary)
     page=db.paginate(query,per_page=30,max_per_page=30)
-    return render_template('registrations.html',title='Cadastros recebidos',page=page)
+    return render_template('registrations.html',title='Novos clientes',page=page,
+                           products=db.session.scalars(db.select(Produto).order_by(Produto.nome)).all())
 
 
 @admin.get('/cadastros-recebidos/<int:identifier>')
@@ -83,11 +103,60 @@ def registration_detail(identifier):
 @admin.post('/cadastros-recebidos/<int:identifier>/habilitar')
 @operator_required('superadmin','comercial')
 def enable_registration(identifier):
+    modalidade = request.form.get('modalidade', '')
+    if modalidade and request.form.get('confirmacao') != 'CONFIRMAR':
+        raise BusinessError('Confirme a conclusão do cadastro e a modalidade escolhida.')
+    if modalidade and modalidade not in ('trial', 'cortesia', 'recorrencia', 'avulsa', 'recusa'):
+        raise BusinessError('Modalidade de contratação inválida.')
+    if modalidade == 'recusa':
+        row = db.session.scalar(db.select(SolicitacaoCadastro).where(
+            SolicitacaoCadastro.id == identifier).with_for_update().execution_options(populate_existing=True))
+        reason = request.form.get('motivo', '').strip()
+        if not row or row.status != 'PENDENTE' or not 3 <= len(reason) <= 500:
+            raise BusinessError('Solicitação não pendente ou motivo da recusa inválido.')
+        before = snapshot(row)
+        row.status, row.motivo = 'RECUSADA', reason
+        audit(row, 'AUTOCADASTRO_RECUSADO', before)
+        db.session.commit()
+        flash('Cadastro recusado. Nenhuma assinatura ou cobrança foi criada.', 'success')
+        return redirect(url_for('admin.received_registrations'))
+    status = ('TRIAL' if modalidade == 'trial' else 'ATIVA') if modalidade else request.form.get('status','TRIAL')
     row=review(identifier,request.form.get('cliente_id',type=int),request.form.get('plano_id',type=int),
-        request.form.get('status','TRIAL'),request.form.get('motivo','Habilitação do autocadastro'))
+        status,request.form.get('motivo','Habilitação do autocadastro'))
+    subscription = row.assinatura
+    if modalidade and subscription.status != status:
+        raise BusinessError('A assinatura existente possui outra condição; revise-a antes de concluir.')
+    if modalidade == 'cortesia':
+        from app.services.assinatura_service import grant_courtesy
+        if subscription.cortesia or subscription.asaas_habilitado:
+            raise BusinessError('Revise a condição de cobrança existente antes de conceder cortesia.')
+        grant_courtesy(subscription, 0, True, request.form.get('motivo', ''))
+    elif modalidade == 'recorrencia':
+        from app.services.asaas_service import configure_subscription, PROPOSTAS_CODES, PROPOSTAS_VALUES
+        config = subscription.produto.config_asaas
+        if not config or not config.ativo:
+            raise BusinessError('Integração de pagamento não configurada para este produto.')
+        if subscription.cortesia:
+            raise BusinessError('Assinatura em cortesia não pode iniciar cobrança.')
+        if subscription.asaas_habilitado:
+            raise BusinessError('A assinatura já possui cobrança habilitada; confira antes de continuar.')
+        if subscription.produto.codigo in PROPOSTAS_CODES:
+            expected = PROPOSTAS_VALUES.get(subscription.plano.periodicidade)
+            if not expected or subscription.plano.valor_mensal != expected[0]:
+                raise BusinessError('O preço do plano diverge da regra atual de cobrança do produto. Não foi criada recorrência.')
+        configure_subscription(subscription, config.ambiente, request.form.get('forma', 'BOLETO'))
+    elif modalidade == 'avulsa':
+        from app.schemas import ChargeInput
+        from app.services.cobranca_service import create_charge
+        data = ChargeInput.model_validate({'assinatura_id': subscription.id, 'tipo': 'avulsa',
+            'competencia': request.form.get('competencia'), 'valor': request.form.get('valor'),
+            'vencimento': request.form.get('vencimento')}).model_dump()
+        create_charge(data)
     db.session.commit()
-    flash('Cadastro habilitado. O vínculo será confirmado pelo produto; nenhuma cobrança foi iniciada.','success')
-    return redirect(url_for('admin.registration_detail',identifier=row.id))
+    flash('Cadastro concluído. O vínculo será confirmado pelo produto.' +
+          (' A recorrência foi encaminhada para processamento; confira o resultado na assinatura.' if modalidade == 'recorrencia' else
+           ' Foi criado apenas um registro local, sem emissão no gateway.' if modalidade == 'avulsa' else ''), 'success')
+    return redirect(url_for('admin.subscription',identifier=row.assinatura_id))
 
 
 @admin.post('/cadastros-recebidos/<int:identifier>/reenviar')

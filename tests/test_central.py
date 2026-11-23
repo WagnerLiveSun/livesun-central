@@ -115,8 +115,9 @@ def test_signed_webhook_retry(app, client):
 
 def test_billing_and_expiry(app, client):
     identifier = create(client, app)
+    db.session.get(Assinatura, identifier).status = 'ATIVA'
     charge = create_charge({'assinatura_id': identifier, 'competencia': '2026-11', 'valor': 50,
-                            'vencimento': date.today() - timedelta(days=1)})
+                            'tipo': 'avulsa', 'vencimento': date.today() - timedelta(days=1)})
     db.session.commit()
     maintenance()
     assert charge.status == 'ATRASADA'

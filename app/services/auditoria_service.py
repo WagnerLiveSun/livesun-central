@@ -5,7 +5,8 @@ from flask_login import current_user
 from app.extensions import db
 from app.models import Auditoria
 
-SECRET_FIELDS = {'senha_hash', 'webhook_secret', 'api_key', 'webhook_token', 'digest'}
+SECRET_FIELDS = {'senha_hash', 'webhook_secret', 'api_key', 'webhook_token', 'digest',
+                 'credenciais_criptografadas'}
 
 
 def snapshot(obj):

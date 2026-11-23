@@ -102,11 +102,9 @@ class WebhookInput(Schema):
 class ChargeInput(Schema):
     assinatura_id: int = Field(gt=0)
     competencia: str = Field(pattern=r'^\d{4}-(0[1-9]|1[0-2])$')
-    valor: Decimal = Field(ge=0, max_digits=12, decimal_places=2)
+    tipo: Literal['plano', 'avulsa'] = 'plano'
+    valor: Decimal | None = Field(default=None, gt=0, max_digits=12, decimal_places=2)
     vencimento: date
-    gateway: str | None = Field(default=None, max_length=50)
-    referencia_externa: str | None = Field(default=None, max_length=150)
-    observacoes: str | None = Field(default=None, max_length=5000)
 
 
 class UserInput(Schema):

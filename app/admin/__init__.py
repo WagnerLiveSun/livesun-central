@@ -4,3 +4,4 @@ from . import auth, dashboard, catalogo, assinaturas, cobrancas, webhooks, audit
 from . import operacao
 from . import cadastros
 from . import empresas_comercial
+from . import gateways_alternativos

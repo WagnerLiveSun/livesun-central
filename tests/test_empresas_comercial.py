@@ -54,7 +54,7 @@ def test_discovery_and_preparation_do_not_migrate_or_bill(app, client, commercia
     with patch.object(service, 'list_companies', return_value=([item], None)):
         response = client.get('/empresas-comercial')
     assert response.status_code == 200
-    assert 'Preparar migração' in response.get_data(as_text=True)
+    assert 'Preparar onboarding' in response.get_data(as_text=True)
     before = db.session.query(Cliente).count()
     row = prepare(item)
     assert prepare(item).id == row.id

@@ -2,7 +2,7 @@ import secrets
 from datetime import date
 from flask import render_template, request, redirect, url_for, abort, flash
 from app.extensions import db
-from app.models import Produto, ConfigAsaas, CredencialServico, EventoAsaas, OperacaoAsaas, Assinatura, PurgaProduto
+from app.models import Produto, ConfigAsaas, CredencialServico, EventoAsaas, OperacaoAsaas, Assinatura, PurgaProduto, Cobranca
 from app.security import operator_required, issue_product_credential, encrypt
 from app.services.auditoria_service import audit, snapshot
 from app.services.assinatura_service import locked, grant_trial, grant_courtesy, BusinessError
@@ -26,8 +26,12 @@ def integrations():
 @operator_required('superadmin','financeiro','comercial')
 def product_billing(identifier):
     product = db.get_or_404(Produto, identifier)
+    charge_counts = dict(db.session.execute(db.select(Cobranca.status, db.func.count(Cobranca.id))
+        .join(Assinatura, Cobranca.assinatura_id == Assinatura.id)
+        .where(Assinatura.produto_id == identifier).group_by(Cobranca.status)).all())
     return render_template('product_billing.html', title='Cobrança · '+product.nome, product=product,
-        config=product.config_asaas, subscriptions=db.session.scalars(db.select(Assinatura).filter_by(produto_id=identifier)).all())
+        config=product.config_asaas, subscriptions=db.session.scalars(db.select(Assinatura).filter_by(produto_id=identifier)).all(),
+        charge_counts=charge_counts)
 
 
 @admin.post('/integracoes/produtos/<int:identifier>/gerar')
@@ -157,6 +161,13 @@ def commercial_action(identifier, action):
     elif action == 'cortesia':
         grant_courtesy(obj, int(request.form.get('dias', '0')), request.form.get('liberado') == 'true', reason)
     elif action == 'asaas':
+        from app.services.asaas_service import PROPOSTAS_CODES, PROPOSTAS_VALUES
+        if obj.status != 'ATIVA' or obj.cortesia:
+            raise BusinessError('A recorrência exige assinatura ativa e sem cortesia.')
+        if obj.produto.codigo in PROPOSTAS_CODES:
+            expected = PROPOSTAS_VALUES.get(obj.plano.periodicidade)
+            if not expected or obj.plano.valor_mensal != expected[0]:
+                raise BusinessError('O preço do plano diverge da regra atual do Asaas. Nenhuma recorrência foi criada.')
         config = obj.produto.config_asaas
         if not config or not config.ativo:
             raise BusinessError('Configure a cobrança no cadastro do produto primeiro.')

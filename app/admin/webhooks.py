@@ -11,7 +11,7 @@ from . import admin
 
 
 @admin.get('/webhooks')
-@operator_required()
+@operator_required('superadmin')
 def deliveries():
     page = db.paginate(db.select(WebhookEntrega).order_by(WebhookEntrega.id.desc()), per_page=30)
     return render_template('webhooks.html', title='Webhooks', page=page,
@@ -19,7 +19,7 @@ def deliveries():
 
 
 @admin.post('/webhooks/<int:identifier>/reenviar')
-@operator_required('superadmin', 'suporte')
+@operator_required('superadmin')
 def resend_delivery(identifier):
     entry = db.get_or_404(WebhookEntrega, identifier)
     resend(entry)
@@ -28,7 +28,7 @@ def resend_delivery(identifier):
 
 
 @admin.post('/webhooks/produtos/<int:identifier>/reenviar-falhas')
-@operator_required('superadmin','suporte')
+@operator_required('superadmin')
 def resend_product_deliveries(identifier):
     product=db.get_or_404(Produto,identifier)
     if request.form.get('confirmacao')!='REENVIAR':
@@ -52,7 +52,7 @@ def configure_webhook():
 
 
 @admin.post('/webhooks/produtos/<int:identifier>/testar')
-@operator_required('superadmin','suporte')
+@operator_required('superadmin')
 def test_receiver(identifier):
     product=db.get_or_404(Produto,identifier)
     if not product.webhook_secret or not product.url_webhook:

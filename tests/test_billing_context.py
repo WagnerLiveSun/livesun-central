@@ -42,7 +42,7 @@ def test_asaas_configuration_attaches_to_product(app,client):
 def test_start_charge_uses_product_account_and_subscription_plan(app,client):
     obj=create(app.test_ids)
     obj.status='ATIVA'
-    obj.plano.valor_mensal=79
+    obj.plano.valor_mensal=80
     config=ConfigAsaas(ambiente='sandbox',api_key=encrypt('test'),webhook_token=encrypt('t'*40),ativo=True)
     obj.produto.config_asaas=config
     db.session.commit()

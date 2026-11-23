@@ -127,16 +127,24 @@ def pull_pending():
     for product in products:
         if not product.url_producao or not product.webhook_secret:
             continue
+        stage = 'destino'
         try:
             url = product.url_producao.rstrip('/') + '/central/cadastros-pendentes'
             validate_destination(url)
             cursor = 0
             while True:
                 path = urlsplit(url).path
+                stage = 'credencial'
                 headers = signed_headers(decrypt(product.webhook_secret), path.encode())
+                stage = 'conexao'
                 with requests.Session() as http:
                     http.trust_env = False
                     response = http.get(url, params={'apos':cursor}, headers=headers, timeout=(3,8), allow_redirects=False)
+                stage = 'resposta'
+                if response.status_code in (401, 403):
+                    stage = 'autenticacao'
+                elif response.status_code in (404, 405):
+                    stage = 'endpoint'
                 if response.status_code != 200 or len(response.content) > 256*1024:
                     raise BusinessError('Produto não confirmou fila de cadastros.')
                 payload = response.json()
@@ -156,7 +164,7 @@ def pull_pending():
             db.session.rollback()
             # Sem dados do cadastro, URL com credenciais ou exceções no log.
             from flask import current_app
-            current_app.logger.warning('pending', extra={'safe_event':'autocadastro_coleta_pendente'})
+            current_app.logger.warning('pending', extra={'safe_event': 'autocadastro_coleta_' + stage})
 
 
 def deliver_one():
