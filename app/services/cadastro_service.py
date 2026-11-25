@@ -188,7 +188,9 @@ def deliver_one():
         url = product.url_producao.rstrip('/') + '/central/cadastros/vincular'
         validate_destination(url)
         data = {**status_payload(row), 'entitlements':effective(subscription)}
-        if product.codigo == 'PROPOSTAS' or legacy:
+        # O receptor do Clínicas também precisa confirmar o documento original
+        # antes de associar a solicitação à assinatura aprovada.
+        if product.codigo in ('PROPOSTAS', 'CLINICAS') or legacy:
             data['cnpj_cpf'] = row.cnpj_cpf
         if legacy:
             data['origem_legada'] = True

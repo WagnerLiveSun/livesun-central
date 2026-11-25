@@ -57,6 +57,18 @@ def seed_comercial():
         db.session.commit()
 
 
+def seed_clinicas():
+    """Registra o produto sem presumir preços, planos, URLs ou credenciais."""
+    product = db.session.scalar(db.select(Produto).filter_by(codigo='CLINICAS'))
+    if product is None:
+        product = Produto(codigo='CLINICAS', nome='LiveSun Clínicas',
+                          permite_multiplos_planos=True, permite_modulos=False, ativo=True)
+        db.session.add(product)
+        db.session.flush()
+        audit(product, 'SEED_PRODUTO_CLINICAS')
+        db.session.commit()
+
+
 def bootstrap_admin():
     """Primeira instalação em nuvem pelo ambiente, sem senha padrão ou shell web."""
     if db.session.scalar(db.select(UsuarioCentral.id).where(UsuarioCentral.perfil == 'superadmin',
@@ -85,8 +97,9 @@ def register_commands(app):
     def seed_command():
         seed()
         seed_comercial()
+        seed_clinicas()
         bootstrap_admin()
-        click.echo('Produto PROPOSTAS e plano único configurados; nenhum cliente ou operador criado.')
+        click.echo('Produtos PROPOSTAS, COMERCIAL e CLINICAS configurados; nenhum cliente criado.')
 
     @app.cli.command('create-admin')
     @click.option('--email', prompt=True)
