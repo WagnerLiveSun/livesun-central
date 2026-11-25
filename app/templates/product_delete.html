@@ -1,0 +1,17 @@
+{% extends 'base.html' %}{% block content %}
+<section class="card">
+  <h2>Excluir {{ product.nome }}</h2>
+  <p>Código: <strong>{{ product.codigo }}</strong> · ID: {{ product.id }}</p>
+  <p>A exclusão é permanente. Não são removidos automaticamente planos, assinaturas, credenciais ou outros registros associados.</p>
+  {% if dependencies %}
+  <p role="alert">Não é possível excluir este produto: {{ dependencies|join(', ') }}. Preserve o histórico e revise os vínculos.</p>
+  {% else %}
+  <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label>Para confirmar, digite o código exato do produto <input name="confirmacao" required autocomplete="off"></label>
+    <button type="submit">Excluir definitivamente</button>
+  </form>
+  {% endif %}
+  <a class="button" href="{{ url_for('admin.listing', kind='produtos') }}">Voltar aos produtos</a>
+</section>
+{% endblock %}

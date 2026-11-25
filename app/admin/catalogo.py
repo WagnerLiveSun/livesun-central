@@ -1,14 +1,14 @@
 import json
 import secrets
 from typing import get_args
-from flask import abort, render_template, request, redirect, url_for
+from flask import abort, flash, render_template, request, redirect, url_for
 from flask_login import current_user
 from app.extensions import db
 from app.models import Cliente, Produto, Plano, Modulo, UsuarioCentral, PlanoModulo
 from app.schemas import ClienteInput, ProdutoInput, PlanoInput, ModuloInput, UserInput
 from app.security import operator_required
 from app.services.catalogo_service import save, set_plan_modules
-from app.services.auditoria_service import snapshot
+from app.services.auditoria_service import audit, snapshot
 from app.services.plano_codigo import commercial_code, COMMERCIAL_TIERS
 from app.services.assinatura_service import BusinessError
 from . import admin
@@ -55,6 +55,37 @@ def listing(kind):
     writable = current_user.perfil == 'superadmin' or (kind != 'usuarios' and current_user.perfil == 'comercial')
     return render_template('list.html', title=title, rows=rows, columns=columns, page=page,
                            kind=kind, writable=writable)
+
+
+@admin.route('/cadastros/produtos/<int:identifier>/excluir', methods=['GET', 'POST'])
+@operator_required('superadmin')
+def delete_product(identifier):
+    from app.models import Assinatura, CredencialServico, GatewayAlternativo, SolicitacaoCadastro, WebhookEntrega
+    product = db.session.scalar(db.select(Produto).where(Produto.id == identifier).with_for_update())
+    if not product:
+        abort(404)
+    dependencies = []
+    for model, label in ((Plano, 'planos'), (Modulo, 'módulos'), (Assinatura, 'assinaturas'),
+                         (SolicitacaoCadastro, 'solicitações de cadastro'), (CredencialServico, 'credenciais'),
+                         (WebhookEntrega, 'entregas de webhook'), (GatewayAlternativo, 'gateways')):
+        if db.session.scalar(db.select(model.id).where(model.produto_id == product.id).limit(1)):
+            dependencies.append(label)
+    if product.url_producao or product.url_webhook or product.webhook_secret or product.config_asaas_id:
+        dependencies.append('configuração de integração ou cobrança')
+    if product.codigo in ('CLINICAS', 'PROPOSTAS', 'COMERCIAL'):
+        dependencies.append('produto oficial do sistema')
+    if request.method == 'POST':
+        if request.form.get('confirmacao', '').strip() != product.codigo:
+            raise BusinessError('Digite o código exato do produto para confirmar a exclusão.')
+        if dependencies:
+            raise BusinessError('Produto não pode ser excluído: existem ' + ', '.join(dependencies) + '. Preserve o histórico e revise os vínculos.')
+        before = snapshot(product)
+        audit(product, 'PRODUTO_EXCLUIDO', before)
+        db.session.delete(product)
+        db.session.commit()
+        flash('Produto excluído. O histórico da operação foi registrado na auditoria.', 'success')
+        return redirect(url_for('admin.listing', kind='produtos'))
+    return render_template('product_delete.html', title='Excluir produto', product=product, dependencies=dependencies)
 
 
 def form_values(schema):
