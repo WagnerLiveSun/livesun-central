@@ -7,6 +7,44 @@ from app.services.cadastro_service import review
 from app.services.assinatura_service import BusinessError
 from app.services.auditoria_service import audit, snapshot
 from . import admin
+@admin.get('/empresas-clinicas')
+@operator_required('superadmin', 'comercial', 'suporte', 'auditor')
+def clinicas_companies():
+    from app.services import empresas_clinicas_service as service
+    cursor = request.args.get('apos', default=0, type=int)
+    if cursor is None or not 0 <= cursor <= 2147483647:
+        raise BusinessError('Página de clínicas inválida.')
+    rows, next_cursor, error = [], None, None
+    try:
+        rows, next_cursor = service.list_companies(cursor)
+    except BusinessError as failure:
+        error = str(failure)
+    product = db.session.scalar(db.select(Produto).where(Produto.codigo == 'CLINICAS'))
+    registrations = {}
+    if product and rows:
+        identifiers = [str(item['dados']['empresa_id']) for item in rows]
+        registrations = {row.empresa_origem: row for row in db.session.scalars(
+            db.select(SolicitacaoCadastro).where(SolicitacaoCadastro.produto_id == product.id,
+                                                SolicitacaoCadastro.empresa_origem.in_(identifiers)))}
+    return render_template('clinicas_companies.html', title='Empresas do Clínicas', rows=rows,
+                           next_cursor=next_cursor, error=error, registrations=registrations)
+
+
+@admin.post('/empresas-clinicas/<int:identifier>/preparar')
+@operator_required('superadmin', 'comercial')
+def prepare_clinicas_company(identifier):
+    from app.services.empresas_clinicas_service import prepare_registration
+    try:
+        row = prepare_registration(identifier)
+        db.session.commit()
+    except BusinessError as failure:
+        db.session.rollback()
+        flash(str(failure), 'warning')
+        return redirect(url_for('admin.clinicas_companies'))
+    flash('Clínica existente preparada sem exigir confirmação de e-mail. Confira os dados e o plano.', 'success')
+    return redirect(url_for('admin.registration_detail', identifier=row.id))
+
+
 
 
 @admin.get('/empresas-propostas')

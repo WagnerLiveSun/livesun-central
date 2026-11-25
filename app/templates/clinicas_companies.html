@@ -1,0 +1,11 @@
+{% extends 'base.html' %}{% block actions %}<a class="button" href="{{ url_for('admin.clinicas_companies') }}">Atualizar clínicas</a>{% endblock %}
+{% block content %}<section class="card">
+<p>Clínicas já existentes podem ser preparadas sem nova confirmação de e-mail. Confira o documento, gestor e plano antes de habilitar. A preparação não inicia cobrança.</p>
+{% if error %}<p class="notice error" role="alert">{{ error }}</p>{% else %}
+<div class="table-wrap"><table><thead><tr><th>ID</th><th>Clínica</th><th>CPF/CNPJ</th><th>E-mail</th><th>Situação</th><th>Ação</th></tr></thead><tbody>
+{% for item in rows %}{% set company=item.dados %}{% set registration=registrations.get(company.empresa_id|string) %}
+<tr><td>{{ company.empresa_id }}</td><td>{{ company.razao_social }}</td><td>{{ company.cnpj_cpf or 'Não informado' }}</td><td>{{ company.email or 'Não informado' }}</td>
+<td>{% if item.cliente_id %}Vinculada{% elif registration %}{{ {'PENDENTE':'Aguardando análise','VINCULO_PENDENTE':'Aguardando vínculo','VINCULADA':'Vinculada'}.get(registration.status,registration.status) }}{% elif item.cadastro_novo %}Autocadastro em andamento{% elif not item.ativo %}Inativa{% elif not item.gestor_ativo %}Sem gestor ativo{% else %}Não vinculada{% endif %}</td>
+<td>{% if registration %}<a class="button" href="{{ url_for('admin.registration_detail',identifier=registration.id) }}">Abrir cadastro</a>{% elif item.ativo and item.gestor_ativo and not item.cadastro_novo and not item.cliente_id and current_user.perfil in ['superadmin','comercial'] %}<form method="post" action="{{ url_for('admin.prepare_clinicas_company',identifier=company.empresa_id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button>Preparar vínculo</button></form>{% else %}—{% endif %}</td></tr>
+{% else %}<tr><td colspan="6">Nenhuma clínica nesta página.</td></tr>{% endfor %}</tbody></table></div>
+{% if next_cursor %}<a class="button" href="{{ url_for('admin.clinicas_companies',apos=next_cursor) }}">Próxima página</a>{% endif %}{% endif %}</section>{% endblock %}
