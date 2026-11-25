@@ -67,8 +67,18 @@ def received_registrations():
                 raise BusinessError('Data do filtro inválida.') from None
             query = query.where(SolicitacaoCadastro.criado_em < boundary if is_end else SolicitacaoCadastro.criado_em >= boundary)
     page=db.paginate(query,per_page=30,max_per_page=30)
+    products = db.session.scalars(db.select(Produto).order_by(Produto.nome)).all()
     return render_template('registrations.html',title='Novos clientes',page=page,
-                           products=db.session.scalars(db.select(Produto).order_by(Produto.nome)).all())
+                           products=products, clinicas_configurado=any(p.codigo == 'CLINICAS' for p in products))
+
+
+@admin.post('/cadastros-recebidos/configurar-clinicas')
+@operator_required('superadmin', 'comercial')
+def configure_clinicas_registration():
+    from app.cli import seed_clinicas
+    seed_clinicas()
+    flash('Produto LiveSun Clínicas disponível. Configure a integração, a credencial e um plano ativo antes de habilitar cadastros.', 'success')
+    return redirect(url_for('admin.received_registrations'))
 
 
 @admin.get('/cadastros-recebidos/<int:identifier>')

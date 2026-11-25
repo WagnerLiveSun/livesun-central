@@ -6,6 +6,7 @@ from app.security import encrypt
 from app.services.cadastro_service import receive, review, deliver_one
 from unittest.mock import patch, Mock
 import json
+from test_central import login
 
 
 def test_clinicas_seed_is_idempotent_without_plans_or_prices(app):
@@ -38,6 +39,34 @@ def test_clinicas_can_submit_registration_without_authorizing_access(app, client
     assert duplicate.json['solicitacao_id'] == response.json['solicitacao_id']
     assert db.session.scalar(db.select(db.func.count()).select_from(Assinatura)) == 0
     assert db.session.scalar(db.select(db.func.count()).select_from(SolicitacaoCadastro)) == 1
+
+
+def test_novos_clientes_configures_clinicas_and_shows_received_registration(app, client):
+    login(client)
+    page = client.get('/cadastros-recebidos').get_data(as_text=True)
+    assert 'Adicionar Clínicas ao catálogo' in page
+    assert client.post('/cadastros-recebidos/configurar-clinicas').status_code == 302
+    assert client.post('/cadastros-recebidos/configurar-clinicas').status_code == 302
+    product = db.session.scalar(db.select(Produto).filter_by(codigo='CLINICAS'))
+    assert product is not None
+    payload = {'evento_id': 'cad_' + 'c' * 32, 'empresa_id': 789,
+               'razao_social': 'Clínica Aurora', 'nome_fantasia': 'Clínica Aurora',
+               'cnpj_cpf': '52998224725', 'email': 'aurora@example.com',
+               'telefone': '11999990000', 'responsavel': 'Gestora Aurora'}
+    response = client.post('/api/v1/cadastros', json=payload,
+                           headers={'Authorization': 'Bearer ' + service_token(product, ['read'])})
+    assert response.status_code == 202
+    html = client.get('/cadastros-recebidos').get_data(as_text=True)
+    assert 'Clínica Aurora' in html and 'LiveSun Clínicas' in html
+    assert 'Adicionar Clínicas ao catálogo' not in html
+    assert db.session.scalar(db.select(db.func.count()).select_from(Produto).filter_by(codigo='CLINICAS')) == 1
+    assert db.session.scalar(db.select(db.func.count()).select_from(Plano).filter_by(produto_id=product.id)) == 0
+
+
+def test_clinicas_catalog_setup_requires_permission(app, client):
+    login(client, 'suporte')
+    assert client.post('/cadastros-recebidos/configurar-clinicas').status_code == 403
+    assert db.session.scalar(db.select(Produto).filter_by(codigo='CLINICAS')) is None
 
 
 def test_clinicas_approval_sends_existing_signed_link_contract_with_document(app):
